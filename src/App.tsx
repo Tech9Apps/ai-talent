@@ -1,8 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import type { User as FirebaseUser } from 'firebase/auth';
-import { auth } from './firebase';
 import {
   Box,
   Alert,
@@ -15,17 +12,20 @@ import { Header } from './components/Header/Header';
 import { Footer } from './components/Footer/Footer';
 import { SideNav } from './components/SideNav/SideNav';
 import { CustomThemeProvider } from './contexts/ThemeContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 // Pages
 import { HomePage } from './pages/HomePage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 
+// Hooks
+import { useAuthContext } from './contexts/hooks/useAuthContext';
+
 // Types
-import type { User, NotificationItem } from './types';
+import type { NotificationItem } from './types';
 
 function AppContent() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading } = useAuthContext();
   const [notifications, setNotifications] = useState<NotificationItem[]>([
     {
       id: '1',
@@ -58,35 +58,6 @@ function AppContent() {
     message: '',
     severity: 'info',
   });
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
-      if (firebaseUser) {
-        setUser({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          photoURL: firebaseUser.photoURL,
-          emailVerified: firebaseUser.emailVerified,
-        });
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      showSnackbar('Successfully signed out', 'success');
-    } catch (error) {
-      console.error('Error signing out:', error);
-      showSnackbar('Error signing out', 'error');
-    }
-  };
 
   const showSnackbar = (message: string, severity: 'success' | 'error' | 'warning' | 'info') => {
     setSnackbar({
@@ -148,12 +119,10 @@ function AppContent() {
       }}>
         <Header 
           user={user} 
-          notifications={notifications}
         />
         
         <SideNav 
-          user={user}
-          onLogout={handleLogout}
+          notifications={notifications}
         />
         
         <Box sx={{ flexGrow: 1 }}>
@@ -200,7 +169,9 @@ function AppContent() {
 function App() {
   return (
     <CustomThemeProvider>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </CustomThemeProvider>
   );
 }
