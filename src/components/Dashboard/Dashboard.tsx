@@ -147,7 +147,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onAuthError 
 }) => {
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <Container  sx={{ py: 4 }}>
       <Grid container spacing={4}>
         {/* Main content area */}
         <Grid size={{ xs: 12, md: 8 }}>
