@@ -5,29 +5,39 @@ module.exports = {
     node: true,
   },
   extends: [
-    "eslint:recommended",
-    "plugin:import/errors",
-    "plugin:import/warnings",
-    "plugin:import/typescript",
-    "google",
-    "plugin:@typescript-eslint/recommended",
+    'eslint:recommended',
+    'plugin:import/errors',
+    'plugin:import/warnings',
+    'plugin:import/typescript',
+    'google',
+    'plugin:@typescript-eslint/recommended',
+    'eslint-config-prettier',
   ],
-  parser: "@typescript-eslint/parser",
+  parser: '@typescript-eslint/parser',
   parserOptions: {
-    project: ["tsconfig.json", "tsconfig.dev.json"],
-    sourceType: "module",
+    project: ['tsconfig.json', 'tsconfig.dev.json'],
+    sourceType: 'module',
+    tsconfigRootDir: __dirname,
   },
-  ignorePatterns: [
-    "/lib/**/*", // Ignore built files.
-    "/generated/**/*", // Ignore generated files.
-  ],
-  plugins: [
-    "@typescript-eslint",
-    "import",
-  ],
+  ignorePatterns: ['/lib/**/*', '/generated/**/*'],
+  plugins: ['@typescript-eslint', 'import'],
   rules: {
-    "quotes": ["error", "double"],
-    "import/no-unresolved": 0,
-    "indent": ["error", 2],
+    '@typescript-eslint/no-unused-vars': 'warn',
+    'no-debugger': 'warn',
+    '@typescript-eslint/no-explicit-any': 'warn',
+    'no-constant-condition': 'warn',
+    'require-jsdoc': 'off',
+    'import/no-unresolved': 'off',
+    '@typescript-eslint/no-non-null-assertion': 'off',
+    'new-cap': 'off',
   },
+  overrides: [
+    {
+      files: ['*.ts', '*.tsx'],
+      rules: {
+        'require-jsdoc': 'off',
+        'valid-jsdoc': 'off',
+      },
+    },
+  ],
 };

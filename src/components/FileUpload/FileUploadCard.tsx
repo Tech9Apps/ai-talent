@@ -1,22 +1,21 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState } from "react";
 import {
   Card,
   CardContent,
   Typography,
   Box,
-  Button,
   CircularProgress,
   Alert,
-} from '@mui/material';
-import { CloudUpload } from '@mui/icons-material';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../firebase';
+  CardActionArea,
+} from "@mui/material";
+import { CloudUpload } from "@mui/icons-material";
+import { uploadFile, FunctionsError, getFriendlyErrorMessage, validateFile } from "../../utils/functions";
+import { SUPPORTED_FILE_TYPES } from "../../../shared";
 
 interface FileUploadCardProps {
-  type: 'cv' | 'jobDescription';
+  type: "cv" | "jobDescription";
   title: string;
   description: string;
-  acceptedFiles: string;
   icon: React.ReactNode;
 }
 
@@ -24,9 +23,10 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
   type,
   title,
   description,
-  acceptedFiles,
   icon,
 }) => {
+  // Get accepted file types from shared constants
+  const acceptedFiles = SUPPORTED_FILE_TYPES[type].join(',');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +36,9 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
     fileInputRef.current?.click();
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -45,100 +47,116 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
     setSuccess(null);
 
     try {
-      // Convert file to base64 for Firebase Functions
-      const fileData = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      // Call Firebase Function
-      const processFile = httpsCallable(functions, 'processUploadedFile');
-      const result = await processFile({
-        fileData,
-        fileName: file.name,
-        fileType: file.type,
-        uploadType: type,
-      });
-
-      console.log('File processed:', result.data);
-      setSuccess(`${file.name} uploaded successfully!`);
+      // Validate file first using shared validation
+      validateFile(file, type);
       
+      // Use the improved upload function with proper error handling
+      const result = await uploadFile(file, type);
+      
+      console.log("File processed:", result);
+      setSuccess(`${file.name} uploaded successfully!`);
+
       // Reset file input
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     } catch (error: unknown) {
-      console.error('Upload error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to upload file';
+      console.error("Upload error:", error);
+      
+      // Use improved error handling with more context
+      let errorMessage: string;
+      
+      if (error instanceof FunctionsError) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = getFriendlyErrorMessage(error);
+      }
+      
+      // Add context about what failed if it's a generic error
+      if (errorMessage === "An unexpected error occurred") {
+        errorMessage = `Failed to upload ${file.name}. Please check your file and try again.`;
+      } else if (errorMessage === "Server error occurred. Please try again later") {
+        errorMessage = `Failed to process ${file.name}. The file may be corrupted or the server is experiencing issues. Please try again later.`;
+      }
+      
       setError(errorMessage);
+      
+      // Reset file input on error
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card 
-      sx={{ 
-        height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column',
-        cursor: loading ? 'not-allowed' : 'pointer',
-        border: '1px solid',
-        borderColor: 'divider',
-        boxShadow: 'none',
-        '&:hover': {
-          boxShadow: 1,
-          borderColor: 'primary.main',
-        },
-        transition: 'all 0.2s ease-in-out',
+    <Card
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        cursor: loading ? "not-allowed" : "pointer",
+        border: "1px solid",
+        borderColor: "divider",
+        boxShadow: "none",
+        transition: "all 0.2s ease-in-out",
       }}
       onClick={!loading ? handleFileSelect : undefined}
     >
-      <CardContent sx={{ flexGrow: 1, textAlign: 'center', p: 3 }}>
-        <Box sx={{ color: 'primary.main', mb: 2 }}>
-          {icon}
-        </Box>
-        
-        <Typography variant="h6" component="h2" gutterBottom sx={{ fontWeight: 500 }}>
-          {title}
-        </Typography>
-        
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          {description}
-        </Typography>
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 2, textAlign: 'left' }}>
-            {error}
-          </Alert>
-        )}
-
-        {success && (
-          <Alert severity="success" sx={{ mb: 2, textAlign: 'left' }}>
-            {success}
-          </Alert>
-        )}
-
-        <Button
-          variant="contained"
-          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <CloudUpload />}
-          disabled={loading}
-          onClick={handleFileSelect}
-          sx={{ mt: 'auto' }}
+      <CardActionArea>
+        <CardContent
+          sx={{ p: 3, display: "flex", alignItems: "center", gap: 3 }}
         >
-          {loading ? 'Uploading...' : 'Choose File'}
-        </Button>
+          {/* Icon on the left */}
+          <Box sx={{ color: "primary.main", minWidth: "auto" }}>{icon}</Box>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={acceptedFiles}
-          onChange={handleFileUpload}
-          style={{ display: 'none' }}
-        />
-      </CardContent>
+          {/* Title and description in the center */}
+          <Box sx={{ flexGrow: 1 }}>
+            <Typography
+              variant="h6"
+              component="h2"
+              gutterBottom
+              sx={{ fontWeight: 500, mb: 0.5 }}
+            >
+              {title}
+            </Typography>
+
+            <Typography variant="body2" color="text.secondary">
+              {description}
+            </Typography>
+
+            {error && (
+              <Alert severity="error" sx={{ mt: 2, textAlign: "left" }}>
+                {error}
+              </Alert>
+            )}
+
+            {success && (
+              <Alert severity="success" sx={{ mt: 2, textAlign: "left" }}>
+                {success}
+              </Alert>
+            )}
+          </Box>
+
+          {/* Upload icon on the right */}
+          <Box sx={{ minWidth: "auto" }}>
+            {loading ? (
+              <CircularProgress size={24} color="primary" />
+            ) : (
+              <CloudUpload sx={{ color: "primary.main", fontSize: 24 }} />
+            )}
+          </Box>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={acceptedFiles}
+            onChange={handleFileUpload}
+            style={{ display: "none" }}
+          />
+        </CardContent>
+      </CardActionArea>
     </Card>
   );
 };
