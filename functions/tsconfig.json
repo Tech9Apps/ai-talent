@@ -9,15 +9,13 @@
     "strict": true,
     "target": "es2022",
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "typeRoots": ["./node_modules/@types"]
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    }
   },
   "compileOnSave": true,
-  "include": [
-    "src",
-    "../shared/**/*"
-  ],
-  "exclude": [
+  "include": ["src/**/*", "../shared/**/*"],
+   "exclude": [
     "../node_modules/**/*",
     "../src/**/*",
     "node_modules/**/*",

@@ -13,13 +13,9 @@ import {
 import {
   uploadFileToStorage,
 } from "../../utils/storage";
-import {
-  FileUploadConfig,
-  FileMetadata,
-  FileUploadRequestData,
-  FileUploadResponse
-} from "../../../../shared";
+
 import { ValidationError } from "../../../../shared/utils/validation";
+import { FileMetadata, FileUploadRequestData, FileUploadResponse, FileUploadConfig } from "@shared/index";
 
 /**
  * Updates user statistics after successful upload

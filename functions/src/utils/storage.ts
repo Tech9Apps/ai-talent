@@ -3,10 +3,9 @@
  * Handles file upload, download, and management operations
  */
 
+import { FileUploadConfig, FileMetadata, validateFile } from "@shared/index";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
-import { FileMetadata, FileUploadConfig } from "../../../shared/types/fileTypes";
-import { validateFile } from "../../../shared/utils/validation";
 
 /**
  * Uploads file to Firebase Storage
@@ -57,7 +56,7 @@ export async function uploadFileToStorage(config: FileUploadConfig): Promise<Fil
       originalName: fileName,
       fileType: fileType || 'application/octet-stream',
       uploadType,
-      uploadedAt: admin.firestore.Timestamp.now() as any, // Cast needed for flexible type
+      uploadedAt: admin.firestore.Timestamp.now() as unknown as Date, // Cast needed for flexible type
       fileSize: buffer.length,
       downloadURL,
       storagePath,

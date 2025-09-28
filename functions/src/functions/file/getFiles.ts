@@ -7,11 +7,8 @@ import { onCall, CallableRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import { withAuthentication, AuthenticatedContext } from "../../middleware/auth";
-import {
-  GetFilesRequestData,
-  GetFilesResponse,
-  FileInfo
-} from "../../../../shared";
+import { GetFilesRequestData, GetFilesResponse, FileInfo } from "@shared/index";
+
 
 
 /**
