@@ -1,31 +1,22 @@
-import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase';
-import { useAuthContext } from './useAuthContext';
-
-export interface UserFile {
-  id: string;
-  fileName: string;
-  fileType: 'cv' | 'jobDescription';
-  uploadedAt: Date;
-  storagePath: string;
-  size: number;
-  aiProcessed?: boolean;
-  aiAnalysis?: Record<string, unknown>;
-  matchesFound?: number;
-}
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { db } from "../../firebase";
+import { useAuthContext } from "./useAuthContext";
+import type { UserFileRecord } from "../../../shared";
 
 export const useUserFiles = () => {
   const { user } = useAuthContext();
-  const [files, setFiles] = useState<UserFile[]>([]);
+  const [files, setFiles] = useState<UserFileRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Get CV file specifically
-  const cvFile = files.find(file => file.fileType === 'cv');
-  
+  const cvFile = files.find((file) => file.uploadType === "cv");
+
   // Get job description files
-  const jobDescriptionFiles = files.filter(file => file.fileType === 'jobDescription');
+  const jobDescriptionFiles = files.filter(
+    (file) => file.uploadType === "jobDescription"
+  );
 
   useEffect(() => {
     if (!user?.uid) {
@@ -38,43 +29,48 @@ export const useUserFiles = () => {
     setError(null);
 
     // Create query for user's files
-    const filesRef = collection(db, 'users', user.uid, 'files');
-    const q = query(
-      filesRef,
-      orderBy('uploadedAt', 'desc')
-    );
+    const filesRef = collection(db, "users", user.uid, "files");
+    const q = query(filesRef, orderBy("uploadedAt", "desc"));
 
     // Set up real-time listener
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
         try {
-          const userFiles: UserFile[] = snapshot.docs.map(doc => {
+          const userFiles: UserFileRecord[] = snapshot.docs.map((doc) => {
             const data = doc.data();
             return {
               id: doc.id,
-              fileName: data.fileName || 'Unknown file',
-              fileType: data.fileType || 'cv',
-              uploadedAt: data.uploadedAt?.toDate() || new Date(),
-              storagePath: data.storagePath || '',
+              userId: data.userId || "",
+              fileName: data.fileName || "Unknown file",
+              originalName:
+                data.originalName || data.fileName || "Unknown file",
+              fileType: data.fileType || "text/plain",
+              uploadType: data.uploadType || "cv",
+              storagePath: data.storagePath || "",
+              downloadURL: data.downloadURL || "",
+              uploadedAt: data.uploadedAt || data.createdAt,
               size: data.size || 0,
-              aiProcessed: data.aiProcessed || false,
+              status: data.status || "uploaded",
+              processed: data.processed || false,
+              aiProcessed: data.aiProcessed,
               aiAnalysis: data.aiAnalysis,
               matchesFound: data.matchesFound,
+              createdAt: data.createdAt,
             };
           });
-          
+
           setFiles(userFiles);
           setLoading(false);
         } catch (err) {
-          console.error('Error processing user files:', err);
-          setError('Failed to load files');
+          console.error("Error processing user files:", err);
+          setError("Failed to load files");
           setLoading(false);
         }
       },
       (err) => {
-        console.error('Error listening to user files:', err);
-        setError('Failed to load files');
+        console.error("Error listening to user files:", err);
+        setError("Failed to load files");
         setLoading(false);
       }
     );
@@ -90,6 +86,6 @@ export const useUserFiles = () => {
     loading,
     error,
     hasCV: !!cvFile,
-    hasCVProcessed: cvFile?.aiProcessed === true,
+    hasCVProcessed: cvFile?.processed === true,
   };
 };

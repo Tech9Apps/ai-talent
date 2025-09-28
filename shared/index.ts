@@ -9,8 +9,10 @@ export * from './constants/fileConstants';
 // Export types
 export type {
   UploadType,
+  FirebaseTimestamp,
   FileUploadConfig,
   FileMetadata,
+  UserFileRecord,
   FileUploadRequestData,
   FileUploadResponse,
   FileInfo,
