@@ -8,9 +8,16 @@ import {
   Alert,
   CardActionArea,
 } from "@mui/material";
-import { CloudUpload } from "@mui/icons-material";
-import { uploadFile, FunctionsError, getFriendlyErrorMessage, validateFile } from "../../utils/functions";
+import { CloudUpload, CheckCircle } from "@mui/icons-material";
+import { uploadFile, processFileWithAI, findJobMatches, FunctionsError, getFriendlyErrorMessage, validateFile } from "../../utils/functions";
 import { SUPPORTED_FILE_TYPES } from "../../../shared";
+
+type ProcessStep = {
+  id: number;
+  name: string;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  message?: string;
+};
 
 interface FileUploadCardProps {
   type: "cv" | "jobDescription";
@@ -28,9 +35,21 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
   // Get accepted file types from shared constants
   const acceptedFiles = SUPPORTED_FILE_TYPES[type].join(',');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [loading, setLoading] = useState(false);
+  
+  const [steps, setSteps] = useState<ProcessStep[]>([
+    { id: 1, name: "Uploading file", status: 'pending' },
+    { id: 2, name: "Analyzing with AI", status: 'pending' },
+    { id: 3, name: "Finding matches", status: 'pending' }
+  ]);
+  
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+
+  const updateStep = (stepId: number, status: ProcessStep['status'], message?: string) => {
+    setSteps(prev => prev.map(step => 
+      step.id === stepId ? { ...step, status, message } : step
+    ));
+  };
 
   const handleFileSelect = () => {
     fileInputRef.current?.click();
@@ -42,19 +61,38 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setLoading(true);
+    setIsProcessing(true);
     setError(null);
-    setSuccess(null);
+    
+    // Reset all steps
+    setSteps(prev => prev.map(step => ({ ...step, status: 'pending' as const })));
 
     try {
       // Validate file first using shared validation
       validateFile(file, type);
       
-      // Use the improved upload function with proper error handling
+      // Step 1: Upload file
+      updateStep(1, 'processing', 'Uploading your file...');
       const result = await uploadFile(file, type);
+      updateStep(1, 'completed', 'File uploaded successfully');
       
-      console.log("File processed:", result);
-      setSuccess(`${file.name} uploaded successfully!`);
+      // Step 2: AI Analysis
+      updateStep(2, 'processing', 'Analyzing with AI...');
+      await processFileWithAI(result.fileId, type);
+      updateStep(2, 'completed', 'AI analysis completed');
+      
+      // Step 3: Find matches (only for CVs)
+      updateStep(3, 'processing', 'Finding job matches...');
+      if (type === 'cv') {
+        const matchResult = await findJobMatches(result.fileId) as { totalMatches?: number };
+        updateStep(3, 'completed', `Found ${matchResult.totalMatches || 0} job matches`);
+      } else {
+        // For job descriptions, just mark as completed without actual matching
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        updateStep(3, 'completed', 'Job description processed');
+      }
+      
+      console.log("Full process completed:", result);
 
       // Reset file input
       if (fileInputRef.current) {
@@ -62,6 +100,12 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
       }
     } catch (error: unknown) {
       console.error("Upload error:", error);
+      
+      // Find which step failed and mark it as error
+      const currentStep = steps.find(step => step.status === 'processing');
+      if (currentStep) {
+        updateStep(currentStep.id, 'error');
+      }
       
       // Use improved error handling with more context
       let errorMessage: string;
@@ -86,7 +130,7 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
         fileInputRef.current.value = "";
       }
     } finally {
-      setLoading(false);
+      setIsProcessing(false);
     }
   };
 
@@ -96,57 +140,90 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        cursor: loading ? "not-allowed" : "pointer",
+        cursor: isProcessing ? "not-allowed" : "pointer",
         border: "1px solid",
         borderColor: "divider",
         boxShadow: "none",
         transition: "all 0.2s ease-in-out",
       }}
-      onClick={!loading ? handleFileSelect : undefined}
+      onClick={!isProcessing ? handleFileSelect : undefined}
     >
       <CardActionArea>
         <CardContent
-          sx={{ p: 3, display: "flex", alignItems: "center", gap: 3 }}
+          sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}
         >
-          {/* Icon on the left */}
-          <Box sx={{ color: "primary.main", minWidth: "auto" }}>{icon}</Box>
+          {/* Header */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <Box sx={{ color: "primary.main", minWidth: "auto" }}>{icon}</Box>
+            
+            <Box sx={{ flexGrow: 1 }}>
+              <Typography
+                variant="h6"
+                component="h2"
+                gutterBottom
+                sx={{ fontWeight: 500, mb: 0.5 }}
+              >
+                {title}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {description}
+              </Typography>
+            </Box>
 
-          {/* Title and description in the center */}
-          <Box sx={{ flexGrow: 1 }}>
-            <Typography
-              variant="h6"
-              component="h2"
-              gutterBottom
-              sx={{ fontWeight: 500, mb: 0.5 }}
-            >
-              {title}
-            </Typography>
-
-            <Typography variant="body2" color="text.secondary">
-              {description}
-            </Typography>
-
-            {error && (
-              <Alert severity="error" sx={{ mt: 2, textAlign: "left" }}>
-                {error}
-              </Alert>
-            )}
-
-            {success && (
-              <Alert severity="success" sx={{ mt: 2, textAlign: "left" }}>
-                {success}
-              </Alert>
-            )}
+            <Box sx={{ minWidth: "auto" }}>
+              {isProcessing ? (
+                <CircularProgress size={24} color="primary" />
+              ) : (
+                <CloudUpload sx={{ color: "primary.main", fontSize: 24 }} />
+              )}
+            </Box>
           </Box>
 
-          {/* Upload icon on the right */}
-          <Box sx={{ minWidth: "auto" }}>
-            {loading ? (
-              <CircularProgress size={24} color="primary" />
-            ) : (
-              <CloudUpload sx={{ color: "primary.main", fontSize: 24 }} />
-            )}
-          </Box>
+          {/* Process Steps */}
+          {(isProcessing || steps.some(step => step.status === 'completed')) && (
+            <Box sx={{ mt: 2 }}>
+              {steps.map((step) => (
+                <Box key={step.id} sx={{ mb: 1 }}>
+                  {step.status === 'processing' && (
+                    <Alert 
+                      severity="info" 
+                      sx={{ 
+                        alignItems: 'center',
+                        '& .MuiAlert-message': { 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 1 
+                        }
+                      }}
+                    >
+                      <CircularProgress size={16} sx={{ mr: 1 }} />
+                      {step.message || step.name}
+                    </Alert>
+                  )}
+                  {step.status === 'completed' && (
+                    <Alert 
+                      severity="success"
+                      icon={<CheckCircle />}
+                    >
+                      {step.message || `${step.name} completed`}
+                    </Alert>
+                  )}
+                  {step.status === 'error' && (
+                    <Alert severity="error">
+                      {step.name} failed
+                    </Alert>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          )}
+
+          {/* Error Alert */}
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
 
           <input
             ref={fileInputRef}
