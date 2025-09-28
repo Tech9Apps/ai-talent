@@ -44,10 +44,13 @@ export async function uploadFileToStorage(config: FileUploadConfig): Promise<Fil
       },
     });
 
-    // Get download URL using signed URL
-    const [downloadURL] = await file.getSignedUrl({
-      action: 'read',
-      expires: '03-01-2030', // Long expiry for permanent access
+    logger.info("File saved to storage successfully", {
+      structuredData: true,
+      userId,
+      fileName: uniqueFileName,
+      storagePath,
+      fileSize: buffer.length,
+      timestamp: new Date().toISOString(),
     });
 
     const metadata: FileMetadata = {
@@ -58,7 +61,7 @@ export async function uploadFileToStorage(config: FileUploadConfig): Promise<Fil
       uploadType,
       uploadedAt: admin.firestore.Timestamp.now() as unknown as Date, // Cast needed for flexible type
       fileSize: buffer.length,
-      downloadURL,
+      downloadURL: "", // No public download URL - file is private
       storagePath,
     };
 

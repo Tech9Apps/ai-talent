@@ -58,10 +58,51 @@ async function updateUserStatistics(
       structuredData: true,
       userId,
       uploadType,
-      error: error instanceof Error ? error.message : String(error),
+      error: error,
       timestamp: new Date().toISOString(),
     });
     // Don't fail the whole function if stats update fails
+  }
+}
+
+/**
+ * Ensures user document exists in Firestore, creates it if it doesn't
+ * @param userId - User ID
+ * @param userInfo - User information from auth context
+ */
+async function ensureUserExists(userId: string, userInfo: any): Promise<void> {
+  try {
+    const userRef = admin.firestore().collection("users").doc(userId);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      await userRef.set({
+        uid: userId,
+        displayName: userInfo?.name || userInfo?.displayName || "",
+        email: userInfo?.email || "",
+        photoURL: userInfo?.picture || userInfo?.photoURL || "",
+        aiTalent: {
+          jobDescriptionUploads: 0,
+        },
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      logger.info("Created new user document", {
+        structuredData: true,
+        userId,
+        email: userInfo?.email || "",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (error) {
+    logger.warn("Failed to create user document", {
+      structuredData: true,
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
+    });
+    // Don't fail the upload if user creation fails
   }
 }
 
@@ -167,6 +208,13 @@ async function handleFileUpload(
       uploadType,
       fileSize: fileData?.length || 0,
       timestamp: new Date().toISOString(),
+    });
+
+    // 0. Ensure user exists in Firestore
+    await ensureUserExists(userId, {
+      name: request.auth?.token?.name,
+      email: request.auth?.token?.email,
+      picture: request.auth?.token?.picture
     });
 
     // 1. Upload file to Firebase Storage
