@@ -116,7 +116,6 @@ const GetStartedSection: React.FC<GetStartedSectionProps> = ({
             type="cv"
             title="Upload Resume"
             description="Upload your resume to get AI-powered job matching and optimization suggestions"
-            acceptedFiles=".pdf,.doc,.docx"
             icon={<Person sx={{ fontSize: 40, color: "#1976d2" }} />}
           />
         </Grid>
@@ -125,7 +124,6 @@ const GetStartedSection: React.FC<GetStartedSectionProps> = ({
             type="jobDescription"
             title="Upload Job Description"
             description="Upload job descriptions to find the best matching candidates from your talent pool"
-            acceptedFiles=".pdf,.doc,.docx,.txt"
             icon={<Business sx={{ fontSize: 40, color: "#1976d2" }} />}
           />
         </Grid>

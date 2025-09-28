@@ -5,11 +5,8 @@
 
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
-import { 
-  FileUploadConfig, 
-  FileMetadata,
-  validateFile 
-} from "../../../shared";
+import { FileMetadata, FileUploadConfig } from "../../../shared/types/fileTypes";
+import { validateFile } from "../../../shared/utils/validation";
 
 /**
  * Uploads file to Firebase Storage

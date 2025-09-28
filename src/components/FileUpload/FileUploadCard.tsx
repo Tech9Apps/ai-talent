@@ -9,13 +9,13 @@ import {
   CardActionArea,
 } from "@mui/material";
 import { CloudUpload } from "@mui/icons-material";
-import { uploadFile, FunctionsError, getFriendlyErrorMessage } from "../../utils/functions";
+import { uploadFile, FunctionsError, getFriendlyErrorMessage, validateFile } from "../../utils/functions";
+import { SUPPORTED_FILE_TYPES } from "../../../shared";
 
 interface FileUploadCardProps {
   type: "cv" | "jobDescription";
   title: string;
   description: string;
-  acceptedFiles: string;
   icon: React.ReactNode;
 }
 
@@ -23,9 +23,10 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
   type,
   title,
   description,
-  acceptedFiles,
   icon,
 }) => {
+  // Get accepted file types from shared constants
+  const acceptedFiles = SUPPORTED_FILE_TYPES[type].join(',');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +47,9 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
     setSuccess(null);
 
     try {
+      // Validate file first using shared validation
+      validateFile(file, type);
+      
       // Use the improved upload function with proper error handling
       const result = await uploadFile(file, type);
       
