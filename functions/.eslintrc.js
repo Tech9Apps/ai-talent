@@ -6,28 +6,42 @@ module.exports = {
   },
   extends: [
     "eslint:recommended",
-    "plugin:import/errors",
-    "plugin:import/warnings",
-    "plugin:import/typescript",
-    "google",
     "plugin:@typescript-eslint/recommended",
+    "plugin:import/recommended",
+    "plugin:import/typescript"
   ],
   parser: "@typescript-eslint/parser",
   parserOptions: {
     project: ["tsconfig.json", "tsconfig.dev.json"],
     sourceType: "module",
+    tsconfigRootDir: __dirname,
   },
   ignorePatterns: [
-    "/lib/**/*", // Ignore built files.
-    "/generated/**/*", // Ignore generated files.
+    "/lib/**/*",       // Ignore built files
+    "/generated/**/*", // Ignore generated files
   ],
   plugins: [
     "@typescript-eslint",
     "import",
   ],
   rules: {
+    // Estilo general
     "quotes": ["error", "double"],
-    "import/no-unresolved": 0,
     "indent": ["error", 2],
+
+    // Import rules
+    "import/no-unresolved": "off",
+
+    // Reglas TS vs ESLint base (evita choques)
+    "no-unused-expressions": "off",               // ❌ desactiva core
+    "@typescript-eslint/no-unused-expressions": "error", // ✅ activa TS-safe
+
+    // Opcional: reglas útiles de TS
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }
+    ],
+    "@typescript-eslint/explicit-function-return-type": "off", // quítalo si quieres forzar return types
+    "@typescript-eslint/no-explicit-any": "warn",              // cámbialo a "error" si no quieres `any`
   },
 };

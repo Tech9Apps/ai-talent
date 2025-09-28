@@ -13,7 +13,7 @@ admin.initializeApp();
 setGlobalOptions({ maxInstances: 10 });
 
 // Export user-related functions
-export { createUserDocument } from "./functions/user/createUser";
+export { onUserCreate } from "./functions/user/createUser";
 
 // Export file-related functions  
 export { processUploadedFile } from "./functions/file/uploadFile";
