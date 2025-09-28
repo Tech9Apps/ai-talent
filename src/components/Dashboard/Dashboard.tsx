@@ -106,7 +106,7 @@ const GetStartedSection: React.FC<GetStartedSectionProps> = ({
   }
 
   return (
-    <Box sx={{ mb: 6 }}>
+    <Box>
       <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 2 }}>
         Get Started
       </Typography>

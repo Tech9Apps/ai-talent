@@ -2,9 +2,8 @@ import OpenAI from "openai";
 import * as logger from "firebase-functions/logger";
 import { CVAnalysis, JobAnalysis } from "../../../shared/types/aiTypes";
 import * as admin from "firebase-admin";
-import pdfParse from "pdf-parse";
-import * as mammoth from "mammoth";
-import * as path from "path";
+import { extractTextFromBuffer, extractTextFromStorageFile } from "../utils/storage";
+
 
 let openai: OpenAI | null = null;
 
@@ -24,100 +23,306 @@ function resolveModel(): string {
   return process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
 }
 
-// Función para extraer texto de diferentes tipos de archivos
-async function extractTextFromBuffer(buffer: Buffer, fileName: string): Promise<string> {
-  const fileExtension = path.extname(fileName).toLowerCase();
-  
-  logger.info('Extracting text from file', {
-    structuredData: true,
-    fileName,
-    fileExtension,
-    size: buffer.length
-  });
+// Función para dividir texto en chunks inteligentes
+function createTextChunks(
+  text: string,
+  maxChunkSize: number = 200000
+): string[] {
+  if (text.length <= maxChunkSize) {
+    return [text];
+  }
 
-  try {
-    switch (fileExtension) {
-      case '.pdf':
-        const pdfData = await pdfParse(buffer);
-        logger.info('PDF text extracted', {
-          structuredData: true,
-          fileName,
-          textLength: pdfData.text.length,
-          pages: pdfData.numpages
-        });
-        return pdfData.text;
+  const chunks: string[] = [];
+  let currentIndex = 0;
 
-      case '.docx':
-      case '.doc':
-        const result = await mammoth.extractRawText({ buffer });
-        logger.info('Word document text extracted', {
-          structuredData: true,
-          fileName,
-          textLength: result.value.length
-        });
-        return result.value;
+  while (currentIndex < text.length) {
+    let chunkEnd = Math.min(currentIndex + maxChunkSize, text.length);
 
-      case '.txt':
-        const textContent = buffer.toString('utf-8');
-        logger.info('Text file content extracted', {
-          structuredData: true,
-          fileName,
-          textLength: textContent.length
-        });
-        return textContent;
+    // Si no estamos al final del texto, buscar un buen punto de corte
+    if (chunkEnd < text.length) {
+      // Buscar el último salto de línea, punto, o espacio para evitar cortar palabras/oraciones
+      const searchEnd = Math.max(
+        chunkEnd - 500,
+        currentIndex + maxChunkSize * 0.9
+      );
+      const lastNewline = text.lastIndexOf("\n", chunkEnd);
+      const lastPeriod = text.lastIndexOf(".", chunkEnd);
+      const lastSpace = text.lastIndexOf(" ", chunkEnd);
 
-      default:
-        // Intenta leer como texto plano por defecto
-        const defaultContent = buffer.toString('utf-8');
-        logger.info('Default text extraction used', {
-          structuredData: true,
-          fileName,
-          fileExtension,
-          textLength: defaultContent.length
-        });
-        return defaultContent;
+      if (lastNewline > searchEnd) {
+        chunkEnd = lastNewline + 1;
+      } else if (lastPeriod > searchEnd) {
+        chunkEnd = lastPeriod + 1;
+      } else if (lastSpace > searchEnd) {
+        chunkEnd = lastSpace + 1;
+      }
     }
-  } catch (error) {
-    logger.error('Text extraction failed', {
-      structuredData: true,
-      fileName,
-      fileExtension,
-      error: error instanceof Error ? error.message : String(error)
-    });
-    throw new Error(`Failed to extract text from ${fileExtension} file: ${error instanceof Error ? error.message : String(error)}`);
+
+    chunks.push(text.slice(currentIndex, chunkEnd).trim());
+    currentIndex = chunkEnd;
   }
+
+  return chunks.filter((chunk) => chunk.length > 0);
 }
 
-// Función para extraer texto de archivo en Firebase Storage
-async function extractTextFromStorageFile(storagePath: string, originalName: string): Promise<string> {
+// Función para mergear respuestas de análisis de manera inteligente
+function mergeAnalysisResponses(responses: any[], kind: "cv" | "job"): any {
+  if (responses.length === 0) return null;
+  if (responses.length === 1) return responses[0];
+
+  const merged: any = {};
+
+  if (kind === "cv") {
+    // Mergear información de CV
+    merged.name = responses.find((r) => r.name && r.name.trim())?.name || "";
+    merged.email =
+      responses.find((r) => r.email && r.email.trim())?.email || "";
+    merged.phone =
+      responses.find((r) => r.phone && r.phone.trim())?.phone || "";
+    merged.location =
+      responses.find((r) => r.location && r.location.trim())?.location || "";
+
+    // Para summary, usar el más largo/completo
+    const summaries = responses.filter((r) => r.summary && r.summary.trim());
+    merged.summary =
+      summaries.length > 0
+        ? summaries.reduce((longest, current) =>
+            current.summary.length > longest.summary.length ? current : longest
+          ).summary
+        : "";
+
+    // Para experienceYears, usar el máximo encontrado
+    merged.experienceYears = Math.max(
+      ...responses.map((r) => r.experienceYears || 0)
+    );
+
+    // Mergear arrays eliminando duplicados
+    merged.technologies = [
+      ...new Set(responses.flatMap((r) => r.technologies || [])),
+    ];
+
+    // Mergear job history eliminando duplicados por company+position
+    const allJobs = responses.flatMap((r) => r.jobHistory || []);
+    const uniqueJobs = allJobs.filter(
+      (job, index, arr) =>
+        index ===
+        arr.findIndex(
+          (j) => j.company === job.company && j.position === job.position
+        )
+    );
+    merged.jobHistory = uniqueJobs;
+
+    // Mergear education eliminando duplicados
+    const allEducation = responses.flatMap((r) => r.education || []);
+    const uniqueEducation = allEducation.filter(
+      (edu, index, arr) =>
+        index ===
+        arr.findIndex(
+          (e) => e.institution === edu.institution && e.degree === edu.degree
+        )
+    );
+    merged.education = uniqueEducation;
+  } else {
+    // Mergear información de job
+    merged.title =
+      responses.find((r) => r.title && r.title.trim())?.title || "";
+    merged.company =
+      responses.find((r) => r.company && r.company.trim())?.company || "";
+    merged.location =
+      responses.find((r) => r.location && r.location.trim())?.location || "";
+    merged.salary =
+      responses.find((r) => r.salary && r.salary.trim())?.salary || "";
+
+    // Para description, usar la más larga/completa
+    const descriptions = responses.filter(
+      (r) => r.description && r.description.trim()
+    );
+    merged.description =
+      descriptions.length > 0
+        ? descriptions.reduce((longest, current) =>
+            current.description.length > longest.description.length
+              ? current
+              : longest
+          ).description
+        : "";
+
+    // Para experienceRequired, usar el máximo encontrado
+    merged.experienceRequired = Math.max(
+      ...responses.map((r) => r.experienceRequired || 0)
+    );
+
+    // Mergear arrays eliminando duplicados
+    merged.requiredSkills = [
+      ...new Set(responses.flatMap((r) => r.requiredSkills || [])),
+    ];
+    merged.requirements = [
+      ...new Set(responses.flatMap((r) => r.requirements || [])),
+    ];
+  }
+
+  // Combinar todos los warnings únicos de todas las respuestas recursivas
+  const allWarnings = responses.flatMap((r) => r.warnings || []);
+  merged.warnings = [...new Set(allWarnings)];
+
+  return merged;
+}
+
+// Función recursiva principal para análisis con chunking
+async function recursiveAnalysis(
+  textChunks: string[],
+  kind: "cv" | "job",
+  chunkIndex: number = 0,
+  accumulatedResponses: any[] = []
+): Promise<any> {
+  if (chunkIndex >= textChunks.length) {
+    return mergeAnalysisResponses(accumulatedResponses, kind);
+  }
+
+  const currentChunk = textChunks[chunkIndex];
+  const client = getOpenAIClient();
+  const model = resolveModel();
+
+  const systemPrompt =
+    kind === "cv"
+      ? "You are a professional CV analyzer. Extract comprehensive information from CVs and respond ONLY with valid JSON."
+      : "You are a professional job analyzer. Extract comprehensive information from job descriptions and respond ONLY with valid JSON.";
+
+  const chunkContext =
+    textChunks.length > 1
+      ? ` (Analyzing part ${chunkIndex + 1} of ${textChunks.length})`
+      : "";
+
+  const userPrompt =
+    kind === "cv"
+      ? `Analyze this CV section and extract comprehensive information in JSON format${chunkContext}:
+
+CV Content:
+${currentChunk}
+
+Required JSON format:
+{
+  "name": "full name",
+  "email": "email address",  
+  "phone": "phone number",
+  "location": "location",
+  "summary": "professional summary",
+  "experienceYears": number,
+  "technologies": ["tech1", "tech2", "tech3"],
+  "jobHistory": [{"company": "company name", "position": "job title", "duration": "time period", "description": "job description"}],
+  "education": [{"institution": "school name", "degree": "degree type", "year": "graduation year"}]
+}
+
+Respond with JSON only:`
+      : `Analyze this job description section and extract comprehensive information in JSON format${chunkContext}:
+
+Job Content:
+${currentChunk}
+
+Required JSON format:
+{
+  "title": "job title",
+  "company": "company name",
+  "location": "location", 
+  "salary": "salary range",
+  "experienceRequired": number,
+  "requiredSkills": ["skill1", "skill2", "skill3"],
+  "description": "detailed job description",
+  "requirements": ["requirement1", "requirement2"]
+}
+
+Respond with JSON only:`;
+
   try {
-    logger.info("Downloading file from storage for text extraction", {
+    logger.info("Processing chunk with recursive analysis", {
       structuredData: true,
-      storagePath,
-      originalName
+      chunkIndex: chunkIndex + 1,
+      totalChunks: textChunks.length,
+      chunkLength: currentChunk.length,
+      kind,
     });
 
-    const bucket = admin.storage().bucket();
-    const file = bucket.file(storagePath);
-    const [buffer] = await file.download();
-    
-    logger.info("File downloaded from storage", {
-      structuredData: true,
-      storagePath,
-      downloadedSize: buffer.length
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.1,
+      max_tokens: 2000,
     });
 
-    return await extractTextFromBuffer(buffer, originalName);
+    const responseContent = response.choices[0]?.message?.content?.trim();
+    if (!responseContent) {
+      logger.warn("Empty response for chunk, skipping", {
+        structuredData: true,
+        chunkIndex: chunkIndex + 1,
+        kind,
+      });
+      return recursiveAnalysis(
+        textChunks,
+        kind,
+        chunkIndex + 1,
+        accumulatedResponses
+      );
+    }
+
+    // Clean and parse JSON
+    const firstBrace = responseContent.indexOf("{");
+    const lastBrace = responseContent.lastIndexOf("}");
+
+    if (firstBrace === -1 || lastBrace === -1) {
+      logger.warn("Invalid JSON response for chunk, skipping", {
+        structuredData: true,
+        chunkIndex: chunkIndex + 1,
+        kind,
+      });
+      return recursiveAnalysis(
+        textChunks,
+        kind,
+        chunkIndex + 1,
+        accumulatedResponses
+      );
+    }
+
+    const cleanedResponse = responseContent.substring(
+      firstBrace,
+      lastBrace + 1
+    );
+    const parsed = JSON.parse(cleanedResponse);
+
+    logger.info("Successfully processed chunk", {
+      structuredData: true,
+      chunkIndex: chunkIndex + 1,
+      totalChunks: textChunks.length,
+      kind,
+    });
+
+    // Continuar recursivamente con el siguiente chunk
+    return recursiveAnalysis(textChunks, kind, chunkIndex + 1, [
+      ...accumulatedResponses,
+      parsed,
+    ]);
   } catch (error) {
-    logger.error('Storage file text extraction failed', {
+    logger.warn("Error processing chunk, continuing with next", {
       structuredData: true,
-      storagePath,
-      originalName,
-      error: error instanceof Error ? error.message : String(error)
+      chunkIndex: chunkIndex + 1,
+      error: error instanceof Error ? error.message : String(error),
+      kind,
     });
-    throw error;
+
+    // Continuar con el siguiente chunk aunque este falle
+    return recursiveAnalysis(
+      textChunks,
+      kind,
+      chunkIndex + 1,
+      accumulatedResponses
+    );
   }
 }
+
+
+
+
 
 export async function analyzeFileWithOpenAI(
   fileBuffer: Buffer,
@@ -125,182 +330,103 @@ export async function analyzeFileWithOpenAI(
   kind: "cv" | "job"
 ): Promise<any> {
   try {
-    logger.info('Starting text-based OpenAI analysis', { 
-      structuredData: true, 
-      originalName, 
-      size: fileBuffer.length, 
-      kind 
+    logger.info("Starting text-based OpenAI analysis", {
+      structuredData: true,
+      originalName,
+      size: fileBuffer.length,
+      kind,
     });
-    
+
     // Extraer texto del archivo
     const extractedText = await extractTextFromBuffer(fileBuffer, originalName);
-    
+
     if (!extractedText || extractedText.trim().length === 0) {
-      throw new Error(`Could not extract text from file ${originalName}. The file might be corrupted, empty, or in an unsupported format.`);
+      throw new Error(
+        `Could not extract text from file ${originalName}. The file might be corrupted, empty, or in an unsupported format.`
+      );
     }
 
     if (extractedText.length < 50) {
-      throw new Error(`File ${originalName} contains very little text (${extractedText.length} characters). This might not be a valid ${kind === 'cv' ? 'CV' : 'job description'}.`);
+      throw new Error(
+        `File ${originalName} contains very little text (${
+          extractedText.length
+        } characters). This might not be a valid ${
+          kind === "cv" ? "CV" : "job description"
+        }.`
+      );
     }
 
-    logger.info('Text extracted successfully, sending to OpenAI', {
+    logger.info("Text extracted successfully, sending to recursive analysis", {
       structuredData: true,
       originalName,
       textLength: extractedText.length,
-      textPreview: extractedText.substring(0, 200) + (extractedText.length > 200 ? '...' : ''),
-      kind
-    });
-    
-    const client = getOpenAIClient();
-    const model = resolveModel();
-    
-    const systemPrompt = kind === "cv" 
-      ? "You are a professional CV analyzer. Extract structured information from CVs and respond ONLY with valid JSON, no additional explanations."
-      : "You are a professional job description analyzer. Extract structured information from job postings and respond ONLY with valid JSON, no additional explanations.";
-      
-    const userPrompt = kind === "cv" 
-      ? `Analyze this CV and extract the information in JSON:
-{
-  "name": "full name",
-  "email": "email address",  
-  "phone": "phone number",
-  "location": "location",
-  "summary": "brief summary",
-  "experienceYears": number,
-  "technologies": ["tech1", "tech2"],
-  "jobHistory": [{"company": "", "position": "", "duration": "", "description": ""}],
-  "education": [{"institution": "", "degree": "", "year": ""}]
-}
-
-CV:
-${extractedText.substring(0, 8000)}
-
-Respond only JSON:`
-      : `Analyze this job offer and extract the information in JSON:
-{
-  "title": "job title",
-  "company": "company name",
-  "location": "location", 
-  "salary": "salary",
-  "experienceRequired": number,
-  "requiredSkills": ["skill1", "skill2"],
-  "description": "job description",
-  "requirements": ["req1", "req2"]
-}
-
-JOB OFFER:
-${extractedText.substring(0, 8000)}
-
-Respond only JSON:`;
-    
-    logger.info('Sending text content to OpenAI', {
-      structuredData: true,
+      textPreview:
+        extractedText.substring(0, 200) +
+        (extractedText.length > 200 ? "..." : ""),
       kind,
-      textLength: extractedText.length
     });
-    
-    const response = await client.chat.completions.create({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      temperature: 0.1,
-      max_tokens: 2500, // Aumentar tokens para respuestas más completas
-    });
-    
-    const responseContent = response.choices[0]?.message?.content?.trim();
-    if (!responseContent) {
-      throw new Error('OpenAI did not return a valid response. This could indicate a problem with the file content.');
-    }
 
-    // Check if response indicates it's not the expected document type
-    if (responseContent.toLowerCase().includes('not a cv') || 
-        responseContent.toLowerCase().includes('not a job') ||
-        responseContent.toLowerCase().includes('invalid document') ||
-        responseContent.toLowerCase().includes('cannot analyze')) {
-      throw new Error(`The file does not appear to be a valid ${kind === 'cv' ? 'CV' : 'job description'}: ${responseContent}`);
-    }
-
-    // Check for token limit issues
-    if (responseContent.toLowerCase().includes('too large') || 
-        responseContent.toLowerCase().includes('token limit') ||
-        responseContent.toLowerCase().includes('exceeds limit')) {
-      throw new Error(`The file is too large to be processed. Please reduce the file size and try again.`);
-    }
-    
-    logger.info('Received response from OpenAI', {
+    // Usar análisis recursivo con chunking optimizado para límites de tokens
+    const textChunks = createTextChunks(extractedText, 150000);
+    logger.info("Created text chunks for analysis", {
       structuredData: true,
-      responseLength: responseContent.length,
-      responsePreview: responseContent.substring(0, 100) + (responseContent.length > 100 ? '...' : ''),
-      kind
+      originalName,
+      totalChunks: textChunks.length,
+      averageChunkSize: Math.round(extractedText.length / textChunks.length),
+      kind,
     });
-    
-    // Clean and validate JSON response
-    let cleanedResponse = responseContent;
-    
-    // Remove any text before the first { or after the last }
-    const firstBrace = cleanedResponse.indexOf('{');
-    const lastBrace = cleanedResponse.lastIndexOf('}');
-    
-    if (firstBrace === -1 || lastBrace === -1 || firstBrace >= lastBrace) {
-      logger.error('Response does not contain valid JSON braces', {
-        structuredData: true,
-        response: responseContent,
-        kind
-      });
-      throw new Error('AI response is not valid JSON format');
-    }
-    
-    cleanedResponse = cleanedResponse.substring(firstBrace, lastBrace + 1);
-    
-    let parsed;
-    try {
-      parsed = JSON.parse(cleanedResponse);
-    } catch (parseError) {
-      logger.error('Failed to parse cleaned JSON response', {
-        structuredData: true,
-        originalResponse: responseContent,
-        cleanedResponse,
-        parseError: parseError instanceof Error ? parseError.message : String(parseError),
-        kind
-      });
-      throw new Error('Invalid JSON in AI response');
+
+    const result = await recursiveAnalysis(textChunks, kind);
+
+    if (!result) {
+      throw new Error(
+        `Failed to analyze ${
+          kind === "cv" ? "CV" : "job description"
+        }. No valid responses received from any text chunks.`
+      );
     }
 
     // Add warnings for missing fields (only warnings, not errors)
-    const warnings: string[] = [];
-    if (kind === 'cv') {
-      if (!parsed.name || !parsed.name.trim()) warnings.push('Name not found in CV');
-      if (!parsed.email || !parsed.email.trim()) warnings.push('Email not found in CV');
-      if (!parsed.experienceYears || parsed.experienceYears === 0) warnings.push('Years of experience not found in CV');
-      if (!parsed.technologies || parsed.technologies.length === 0) warnings.push('Technologies not found in CV');
-      if (!parsed.jobHistory || parsed.jobHistory.length === 0) warnings.push('Job history not found in CV');
+    const warnings: string[] = result.warnings || [];
+    if (kind === "cv") {
+      if (!result.name || !result.name.trim())
+        warnings.push("Name not found in CV");
+      if (!result.email || !result.email.trim())
+        warnings.push("Email not found in CV");
+      if (!result.experienceYears || result.experienceYears === 0)
+        warnings.push("Years of experience not found in CV");
+      if (!result.technologies || result.technologies.length === 0)
+        warnings.push("Technologies not found in CV");
+      if (!result.jobHistory || result.jobHistory.length === 0)
+        warnings.push("Job history not found in CV");
     } else {
-      if (!parsed.title || !parsed.title.trim()) warnings.push('Job title not found');
-      if (!parsed.company || !parsed.company.trim()) warnings.push('Company name not found');
-      if (!parsed.requiredSkills || parsed.requiredSkills.length === 0) warnings.push('Required skills not found');
-      if (!parsed.description || !parsed.description.trim()) warnings.push('Job description not found');
+      if (!result.title || !result.title.trim())
+        warnings.push("Job title not found");
+      if (!result.company || !result.company.trim())
+        warnings.push("Company name not found");
+      if (!result.requiredSkills || result.requiredSkills.length === 0)
+        warnings.push("Required skills not found");
+      if (!result.description || !result.description.trim())
+        warnings.push("Job description not found");
     }
-    
-    // Add warnings to parsed object
-    parsed.warnings = warnings;
 
-    logger.info('Text-based analysis completed successfully', { 
-      structuredData: true, 
-      kind, 
+    result.warnings = warnings;
+
+    logger.info("Recursive analysis completed successfully", {
+      structuredData: true,
+      kind,
       originalName,
-      textLength: extractedText.length,
-      warningsCount: warnings.length
+      totalChunks: textChunks.length,
+      warningsCount: warnings.length,
     });
-    
-    return parsed;
+
+    return result;
   } catch (error) {
-    logger.error('Text-based OpenAI analysis failed', { 
-      structuredData: true, 
-      originalName, 
-      kind, 
-      error: error instanceof Error ? error.message : String(error) 
+    logger.error("Text-based OpenAI analysis failed", {
+      structuredData: true,
+      originalName,
+      kind,
+      error: error instanceof Error ? error.message : String(error),
     });
     throw error;
   }
@@ -312,308 +438,175 @@ export async function analyzeStorageFileWithOpenAI(
   kind: "cv" | "job"
 ): Promise<any> {
   try {
-    logger.info("Starting storage-based text analysis", { 
-      structuredData: true, 
-      storagePath, 
-      originalName, 
-      kind 
+    logger.info("Starting storage-based text analysis", {
+      structuredData: true,
+      storagePath,
+      originalName,
+      kind,
     });
-    
+
     // Extraer texto del archivo de storage
-    const extractedText = await extractTextFromStorageFile(storagePath, originalName);
-    
+    const extractedText = await extractTextFromStorageFile(
+      storagePath,
+      originalName
+    );
+
     if (!extractedText || extractedText.trim().length === 0) {
-      throw new Error(`Could not extract text from file ${originalName}. The file might be corrupted, empty, or in an unsupported format.`);
+      throw new Error(
+        `Could not extract text from file ${originalName}. The file might be corrupted, empty, or in an unsupported format.`
+      );
     }
 
     if (extractedText.length < 50) {
-      throw new Error(`File ${originalName} contains very little text (${extractedText.length} characters). This might not be a valid ${kind === 'cv' ? 'CV' : 'job description'}.`);
+      throw new Error(
+        `File ${originalName} contains very little text (${
+          extractedText.length
+        } characters). This might not be a valid ${
+          kind === "cv" ? "CV" : "job description"
+        }.`
+      );
     }
 
-    logger.info('Text extracted from storage file, sending to OpenAI', {
+    logger.info(
+      "Text extracted from storage file, sending to recursive analysis",
+      {
+        structuredData: true,
+        storagePath,
+        originalName,
+        textLength: extractedText.length,
+        textPreview:
+          extractedText.substring(0, 200) +
+          (extractedText.length > 200 ? "..." : ""),
+        kind,
+      }
+    );
+
+    // Usar análisis recursivo con chunking optimizado para límites de tokens
+    const textChunks = createTextChunks(extractedText, 200000);
+    logger.info("Created text chunks for storage file analysis", {
       structuredData: true,
       storagePath,
       originalName,
-      textLength: extractedText.length,
-      textPreview: extractedText.substring(0, 200) + (extractedText.length > 200 ? '...' : ''),
-      kind
-    });
-    
-    const client = getOpenAIClient();
-    const model = resolveModel();
-    
-    const systemPrompt = kind === "cv" 
-      ? "You are a professional CV analyzer. Extract structured information from CVs and respond ONLY with valid JSON, no additional explanations."
-      : "You are a professional job description analyzer. Extract structured information from job postings and respond ONLY with valid JSON, no additional explanations.";
-      
-    const userPrompt = kind === "cv" 
-      ? `Analyze this CV and extract the information in JSON:
-{
-  "name": "full name",
-  "email": "email address",
-  "phone": "phone number",
-  "location": "location", 
-  "summary": "brief summary",
-  "experienceYears": number,
-  "technologies": ["tech1", "tech2"],
-  "jobHistory": [{"company": "", "position": "", "duration": "", "description": ""}],
-  "education": [{"institution": "", "degree": "", "year": ""}]
-}
-
-CV:
-${extractedText.substring(0, 8000)}
-
-Respond only JSON:`
-      : `Analyze this job offer and extract the information in JSON:
-{
-  "title": "job title",
-  "company": "company name",
-  "location": "location", 
-  "salary": "salary",
-  "experienceRequired": number,
-  "requiredSkills": ["skill1", "skill2"],
-  "description": "job description",
-  "requirements": ["req1", "req2"]
-}
-
-JOB OFFER:
-${extractedText.substring(0, 8000)}
-
-Respond only JSON:`;
-    
-    logger.info('Sending storage file text content to OpenAI', {
-      structuredData: true,
-      storagePath,
+      totalChunks: textChunks.length,
+      averageChunkSize: Math.round(extractedText.length / textChunks.length),
       kind,
-      textLength: extractedText.length
     });
-    
-    const response = await client.chat.completions.create({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      temperature: 0.1,
-      max_tokens: 2500,
-    });
-    
-    const responseContent = response.choices[0]?.message?.content?.trim();
-    if (!responseContent) {
-      throw new Error('OpenAI did not return a valid response. This could indicate a problem with the file content.');
-    }
 
-    // Check if response indicates it's not the expected document type
-    if (responseContent.toLowerCase().includes('not a cv') || 
-        responseContent.toLowerCase().includes('not a job') ||
-        responseContent.toLowerCase().includes('invalid document') ||
-        responseContent.toLowerCase().includes('cannot analyze')) {
-      throw new Error(`The file does not appear to be a valid ${kind === 'cv' ? 'CV' : 'job description'}: ${responseContent}`);
-    }
+    const result = await recursiveAnalysis(textChunks, kind);
 
-    // Check for token limit issues
-    if (responseContent.toLowerCase().includes('too large') || 
-        responseContent.toLowerCase().includes('token limit') ||
-        responseContent.toLowerCase().includes('exceeds limit')) {
-      throw new Error(`The file is too large to be processed. Please reduce the file size and try again.`);
-    }
-    
-    logger.info('Received response from OpenAI for storage file', {
-      structuredData: true,
-      responseLength: responseContent.length,
-      responsePreview: responseContent.substring(0, 100) + (responseContent.length > 100 ? '...' : ''),
-      storagePath,
-      kind
-    });
-    
-    // Clean and validate JSON response
-    let cleanedResponse = responseContent;
-    
-    // Remove any text before the first { or after the last }
-    const firstBrace = cleanedResponse.indexOf('{');
-    const lastBrace = cleanedResponse.lastIndexOf('}');
-    
-    if (firstBrace === -1 || lastBrace === -1 || firstBrace >= lastBrace) {
-      logger.error('Response does not contain valid JSON braces', {
-        structuredData: true,
-        response: responseContent,
-        storagePath,
-        kind
-      });
-      throw new Error('AI response is not valid JSON format');
-    }
-    
-    cleanedResponse = cleanedResponse.substring(firstBrace, lastBrace + 1);
-    
-    let parsed;
-    try {
-      parsed = JSON.parse(cleanedResponse);
-    } catch (parseError) {
-      logger.error('Failed to parse cleaned JSON response', {
-        structuredData: true,
-        originalResponse: responseContent,
-        cleanedResponse,
-        parseError: parseError instanceof Error ? parseError.message : String(parseError),
-        storagePath,
-        kind
-      });
-      throw new Error('Invalid JSON in AI response');
+    if (!result) {
+      throw new Error(
+        `Failed to analyze ${
+          kind === "cv" ? "CV" : "job description"
+        }. No valid responses received from any text chunks.`
+      );
     }
 
     // Add warnings for missing fields (only warnings, not errors)
-    const warnings: string[] = [];
-    if (kind === 'cv') {
-      if (!parsed.name || !parsed.name.trim()) warnings.push('Name not found in CV');
-      if (!parsed.email || !parsed.email.trim()) warnings.push('Email not found in CV');
-      if (!parsed.experienceYears || parsed.experienceYears === 0) warnings.push('Years of experience not found in CV');
-      if (!parsed.technologies || parsed.technologies.length === 0) warnings.push('Technologies not found in CV');
-      if (!parsed.jobHistory || parsed.jobHistory.length === 0) warnings.push('Job history not found in CV');
+    const warnings: string[] = result.warnings || [];
+    if (kind === "cv") {
+      if (!result.name || !result.name.trim())
+        warnings.push("Name not found in CV");
+      if (!result.email || !result.email.trim())
+        warnings.push("Email not found in CV");
+      if (!result.experienceYears || result.experienceYears === 0)
+        warnings.push("Years of experience not found in CV");
+      if (!result.technologies || result.technologies.length === 0)
+        warnings.push("Technologies not found in CV");
+      if (!result.jobHistory || result.jobHistory.length === 0)
+        warnings.push("Job history not found in CV");
     } else {
-      if (!parsed.title || !parsed.title.trim()) warnings.push('Job title not found');
-      if (!parsed.company || !parsed.company.trim()) warnings.push('Company name not found');
-      if (!parsed.requiredSkills || parsed.requiredSkills.length === 0) warnings.push('Required skills not found');
-      if (!parsed.description || !parsed.description.trim()) warnings.push('Job description not found');
+      if (!result.title || !result.title.trim())
+        warnings.push("Job title not found");
+      if (!result.company || !result.company.trim())
+        warnings.push("Company name not found");
+      if (!result.requiredSkills || result.requiredSkills.length === 0)
+        warnings.push("Required skills not found");
+      if (!result.description || !result.description.trim())
+        warnings.push("Job description not found");
     }
-    
-    // Add warnings to parsed object
-    parsed.warnings = warnings;
-    
-    logger.info('Storage-based text analysis completed successfully', { 
-      structuredData: true, 
-      storagePath, 
+
+    result.warnings = warnings;
+
+    logger.info("Storage-based recursive analysis completed successfully", {
+      structuredData: true,
+      storagePath,
       originalName,
-      textLength: extractedText.length,
+      totalChunks: textChunks.length,
       warningsCount: warnings.length,
-      kind 
+      kind,
     });
-    
-    return parsed;
+
+    return result;
   } catch (error) {
-    logger.error('Storage-based text analysis failed', { 
-      structuredData: true, 
-      storagePath, 
-      originalName, 
-      kind, 
-      error: error instanceof Error ? error.message : String(error) 
+    logger.error("Storage-based text analysis failed", {
+      structuredData: true,
+      storagePath,
+      originalName,
+      kind,
+      error: error instanceof Error ? error.message : String(error),
     });
     throw error;
   }
 }
 
 export async function analyzeCVWithOpenAI(text: string): Promise<CVAnalysis> {
-  const warnings: string[] = [];
-
   try {
-    logger.info("Analyzing CV with OpenAI", {
+    logger.info("Analyzing CV with recursive chunking", {
       structuredData: true,
       textLength: text.length,
     });
 
-    const completion = await getOpenAIClient().chat.completions.create({
-      model: resolveModel(),
-      messages: [
-        {
-          role: "system",
-          content: "You are a professional CV analyzer. You MUST respond with ONLY valid JSON, no explanations, no apologies, no additional text.",
-        },
-        {
-          role: "user",
-          content: `Analyze this CV/Resume text and extract the following information in JSON format:
-
-CV Text:
-${text}
-
-Extract:
-- jobHistory: Array of job positions with company and dates (e.g., ["Software Developer at TechCorp (2020-2023)"])
-- technologies: Array of technical skills, programming languages, frameworks, tools
-- experienceYears: Total years of professional experience (number)
-- name: Full name of the person
-- email: Email address
-- phone: Phone number
-- location: Current location/city
-- summary: Brief professional summary (2-3 sentences)
-- education: Array of educational background (e.g., ["Computer Science, University of XYZ (2018)"])
-
-CRITICAL: Return ONLY valid JSON. Start with { and end with }. No explanations before or after.`,
-        },
-      ],
-      max_tokens: 1500,
-      temperature: 0.1,
-    });
-
-    const responseContent = completion.choices[0]?.message?.content?.trim();
-    if (!responseContent) {
-      warnings.push("OpenAI returned empty response");
-      throw new Error("Empty response from OpenAI");
-    }
-
-    logger.info("CV analysis - received OpenAI response", {
+    // Usar el mismo sistema recursivo con chunks optimizados
+    const textChunks = createTextChunks(text, 200000);
+    logger.info("Created text chunks for CV analysis", {
       structuredData: true,
-      textLength: text.length,
-      responseLength: responseContent.length,
-      fullResponse: responseContent, // Log completo de la respuesta
+      totalChunks: textChunks.length,
+      averageChunkSize: Math.round(text.length / textChunks.length),
     });
 
-    // Clean and validate JSON response
-    let cleanedResponse = responseContent;
-    
-    // Remove any text before the first { or after the last }
-    const firstBrace = cleanedResponse.indexOf('{');
-    const lastBrace = cleanedResponse.lastIndexOf('}');
-    
-    if (firstBrace === -1 || lastBrace === -1 || firstBrace >= lastBrace) {
-      logger.error('CV analysis response does not contain valid JSON braces', {
-        structuredData: true,
-        response: responseContent,
-      });
-      warnings.push("AI response is not valid JSON format");
-      throw new Error("AI response is not valid JSON format");
-    }
-    
-    cleanedResponse = cleanedResponse.substring(firstBrace, lastBrace + 1);
+    const result = await recursiveAnalysis(textChunks, "cv");
 
-    let parsedData;
-    try {
-      parsedData = JSON.parse(cleanedResponse);
-    } catch (parseError) {
-      logger.error('Failed to parse CV analysis JSON response', {
-        structuredData: true,
-        originalResponse: responseContent,
-        cleanedResponse,
-        parseError: parseError instanceof Error ? parseError.message : String(parseError)
-      });
-      warnings.push("Failed to parse AI response as JSON");
-      throw new Error("Invalid JSON response from AI");
+    if (!result) {
+      throw new Error(
+        "Failed to analyze CV. No valid responses received from any text chunks."
+      );
     }
 
+    // Convert to CVAnalysis format
     const analysis: CVAnalysis = {
-      jobHistory: parsedData.jobHistory || [],
-      technologies: parsedData.technologies || [],
-      experienceYears: parsedData.experienceYears || 0,
-      education: parsedData.education || [],
-      warnings: [...warnings],
+      jobHistory: result.jobHistory || [],
+      technologies: result.technologies || [],
+      experienceYears: result.experienceYears || 0,
+      education: result.education || [],
+      warnings: result.warnings || [],
     };
 
-    if (parsedData.name) analysis.name = parsedData.name;
-    if (parsedData.email) analysis.email = parsedData.email;
-    if (parsedData.phone) analysis.phone = parsedData.phone;
-    if (parsedData.location) analysis.location = parsedData.location;
-    if (parsedData.summary) analysis.summary = parsedData.summary;
+    if (result.name) analysis.name = result.name;
+    if (result.email) analysis.email = result.email;
+    if (result.phone) analysis.phone = result.phone;
+    if (result.location) analysis.location = result.location;
+    if (result.summary) analysis.summary = result.summary;
 
+    // Add missing field warnings
     if (!analysis.name) analysis.warnings.push("Name not found in CV");
     if (!analysis.email) analysis.warnings.push("Email not found in CV");
-    if (analysis.jobHistory.length === 0) analysis.warnings.push("No work experience found");
-    if (analysis.technologies.length === 0) analysis.warnings.push("No technical skills identified");
-    if (analysis.experienceYears === 0) analysis.warnings.push("Could not determine years of experience");
+    if (analysis.jobHistory.length === 0)
+      analysis.warnings.push("No work experience found");
+    if (analysis.technologies.length === 0)
+      analysis.warnings.push("No technical skills identified");
+    if (analysis.experienceYears === 0)
+      analysis.warnings.push("Could not determine years of experience");
 
-    logger.info("CV analysis completed", {
+    logger.info("CV recursive analysis completed", {
       structuredData: true,
+      totalChunks: textChunks.length,
       warningsCount: analysis.warnings.length,
     });
 
     return analysis;
   } catch (error) {
-    logger.error("Failed to analyze CV with OpenAI", {
+    logger.error("Failed to analyze CV with recursive chunking", {
       structuredData: true,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -624,7 +617,6 @@ CRITICAL: Return ONLY valid JSON. Start with { and end with }. No explanations b
       experienceYears: 0,
       education: [],
       warnings: [
-        ...warnings,
         "AI analysis failed",
         error instanceof Error ? error.message : "Unknown error occurred",
       ],
@@ -633,118 +625,64 @@ CRITICAL: Return ONLY valid JSON. Start with { and end with }. No explanations b
 }
 
 export async function analyzeJobWithOpenAI(text: string): Promise<JobAnalysis> {
-  const warnings: string[] = [];
-
   try {
-    logger.info("Analyzing Job Description with OpenAI", {
+    logger.info("Analyzing Job Description with recursive chunking", {
       structuredData: true,
       textLength: text.length,
     });
 
-    const completion = await getOpenAIClient().chat.completions.create({
-      model: resolveModel(),
-      messages: [
-        {
-          role: "system",
-          content: "You are a professional job description analyzer. You MUST respond with ONLY valid JSON, no explanations, no apologies, no additional text.",
-        },
-        {
-          role: "user",
-          content: `Analyze this Job Description text and extract the following information in JSON format:
-
-Job Description Text:
-${text}
-
-Extract:
-- title: Job title/position
-- company: Company name
-- requiredSkills: Array of technical skills, technologies, frameworks required
-- experienceRequired: Minimum years of experience required (number)
-- location: Job location (city, state, or "Remote")
-- salary: Salary range if mentioned
-- description: Brief job description (2-3 sentences)
-- requirements: Array of key requirements/qualifications
-
-CRITICAL: Return ONLY valid JSON. Start with { and end with }. No explanations before or after.`,
-        },
-      ],
-      max_tokens: 1000,
-      temperature: 0.1,
-    });
-
-    const responseContent = completion.choices[0]?.message?.content?.trim();
-    if (!responseContent) {
-      warnings.push("OpenAI returned empty response");
-      throw new Error("Empty response from OpenAI");
-    }
-
-    logger.info("Job analysis - received OpenAI response", {
+    // Usar el mismo sistema recursivo con chunks optimizados
+    const textChunks = createTextChunks(text, 200000);
+    logger.info("Created text chunks for Job analysis", {
       structuredData: true,
-      textLength: text.length,
-      responseLength: responseContent.length,
-      fullResponse: responseContent, // Log completo de la respuesta
+      totalChunks: textChunks.length,
+      averageChunkSize: Math.round(text.length / textChunks.length),
     });
 
-    // Clean and validate JSON response
-    let cleanedResponse = responseContent;
-    
-    // Remove any text before the first { or after the last }
-    const firstBrace = cleanedResponse.indexOf('{');
-    const lastBrace = cleanedResponse.lastIndexOf('}');
-    
-    if (firstBrace === -1 || lastBrace === -1 || firstBrace >= lastBrace) {
-      logger.error('Job analysis response does not contain valid JSON braces', {
-        structuredData: true,
-        response: responseContent,
-      });
-      warnings.push("AI response is not valid JSON format");
-      throw new Error("AI response is not valid JSON format");
-    }
-    
-    cleanedResponse = cleanedResponse.substring(firstBrace, lastBrace + 1);
+    const result = await recursiveAnalysis(textChunks, "job");
 
-    let parsedData;
-    try {
-      parsedData = JSON.parse(cleanedResponse);
-    } catch (parseError) {
-      logger.error('Failed to parse Job analysis JSON response', {
-        structuredData: true,
-        originalResponse: responseContent,
-        cleanedResponse,
-        parseError: parseError instanceof Error ? parseError.message : String(parseError)
-      });
-      warnings.push("Failed to parse AI response as JSON");
-      throw new Error("Invalid JSON response from AI");
+    if (!result) {
+      throw new Error(
+        "Failed to analyze job description. No valid responses received from any text chunks."
+      );
     }
 
+    // Convert to JobAnalysis format
     const analysis: JobAnalysis = {
-      title: parsedData.title || "Unknown Position",
-      requiredSkills: parsedData.requiredSkills || [],
-      experienceRequired: parsedData.experienceRequired || 0,
-      description: parsedData.description || "",
-      requirements: parsedData.requirements || [],
-      warnings: [...warnings],
+      title: result.title || "Unknown Position",
+      requiredSkills: result.requiredSkills || [],
+      experienceRequired: result.experienceRequired || 0,
+      description: result.description || "",
+      requirements: result.requirements || [],
+      warnings: result.warnings || [],
     };
 
-    if (parsedData.company) analysis.company = parsedData.company;
-    if (parsedData.location) analysis.location = parsedData.location;
-    if (parsedData.salary) analysis.salary = parsedData.salary;
+    if (result.company) analysis.company = result.company;
+    if (result.location) analysis.location = result.location;
+    if (result.salary) analysis.salary = result.salary;
 
-    if (analysis.title === "Unknown Position") analysis.warnings.push("Job title not clearly identified");
+    // Add missing field warnings
+    if (analysis.title === "Unknown Position")
+      analysis.warnings.push("Job title not clearly identified");
     if (!analysis.company) analysis.warnings.push("Company name not found");
-    if (analysis.requiredSkills.length === 0) analysis.warnings.push("No technical requirements identified");
-    if (analysis.experienceRequired === 0) analysis.warnings.push("Experience requirements not specified");
-    if (!analysis.location) analysis.warnings.push("Job location not specified");
-    if (analysis.requirements.length === 0) analysis.warnings.push("Job requirements not clearly listed");
+    if (analysis.requiredSkills.length === 0)
+      analysis.warnings.push("No technical requirements identified");
+    if (analysis.experienceRequired === 0)
+      analysis.warnings.push("Experience requirements not specified");
+    if (!analysis.location)
+      analysis.warnings.push("Job location not specified");
+    if (analysis.requirements.length === 0)
+      analysis.warnings.push("Job requirements not clearly listed");
 
-    logger.info("Job analysis completed", {
+    logger.info("Job recursive analysis completed", {
       structuredData: true,
+      totalChunks: textChunks.length,
       warningsCount: analysis.warnings.length,
     });
 
     return analysis;
   } catch (error) {
-    logger.error("Failed to analyze Job Description with OpenAI", {
+    logger.error("Failed to analyze Job Description with recursive chunking", {
       structuredData: true,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -756,7 +694,6 @@ CRITICAL: Return ONLY valid JSON. Start with { and end with }. No explanations b
       description: "",
       requirements: [],
       warnings: [
-        ...warnings,
         "AI analysis failed",
         error instanceof Error ? error.message : "Unknown error occurred",
       ],

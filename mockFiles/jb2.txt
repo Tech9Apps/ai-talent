@@ -1,0 +1,50 @@
+Job Description – Frontend Developer
+About the Role
+
+We are seeking a Frontend Developer passionate about creating modern, user-friendly, and performant web applications. You will work closely with designers and backend engineers to deliver outstanding digital experiences.
+
+Responsibilities
+
+Develop responsive web interfaces using React, Next.js, and Material UI.
+
+Transform UI/UX designs into high-quality, reusable components.
+
+Ensure application performance, accessibility, and cross-browser compatibility.
+
+Collaborate with backend engineers to integrate APIs and services.
+
+Write unit and integration tests to maintain high code quality.
+
+Participate in agile ceremonies (sprint planning, reviews, retrospectives).
+
+Requirements
+
+Strong proficiency in JavaScript/TypeScript and modern frameworks (React preferred).
+
+Experience with CSS-in-JS, Tailwind, or Material UI for styling.
+
+Familiarity with version control (Git) and agile workflows.
+
+Understanding of RESTful APIs and basic backend integration.
+
+Strong problem-solving skills and attention to detail.
+
+Nice to Have
+
+Knowledge of Next.js App Router and server-side rendering.
+
+Experience with state management libraries (Redux, Zustand, Recoil).
+
+Exposure to testing frameworks (Jest, Testing Library, Cypress).
+
+Interest in fintech, SaaS platforms, or scalable B2C apps.
+
+Benefits
+
+Competitive salary and remote work flexibility.
+
+Opportunities for rapid growth in a fast-moving team.
+
+Continuous learning environment with mentorship.
+
+Health benefits, wellness perks, and generous PTO.

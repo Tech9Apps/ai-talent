@@ -22,7 +22,7 @@ import {
   JobAnalysis,
 } from "../../../../shared/types/aiTypes";
 import { analyzeCVWithOpenAI, analyzeJobWithOpenAI, analyzeStorageFileWithOpenAI, analyzeFileWithOpenAI } from "../../services/openaiService";
-import { AI_PROCESSING_LIMITS } from "@shared/index";
+import { FILE_VALIDATION_CONFIG } from "@shared/index";
 
 /**
  * Stores AI analysis results in Firestore
@@ -145,7 +145,7 @@ async function handleAIProcessing(
     const file = bucket.file(storagePath);
     const [metadata] = await file.getMetadata();
     const sizeBytes = Number(metadata.size || 0);
-    const MAX_SIZE_BYTES = AI_PROCESSING_LIMITS.maxAIFileSizeBytes; 
+    const MAX_SIZE_BYTES = FILE_VALIDATION_CONFIG.maxSizeBytes; 
     
     logger.info("File metadata retrieved", {
       structuredData: true,
@@ -155,14 +155,14 @@ async function handleAIProcessing(
     });
     
     if (sizeBytes > MAX_SIZE_BYTES) {
-      logger.error('File too large for AI processing', { 
+      logger.error('File too large', { 
         structuredData: true, 
         userId, 
         fileId, 
         sizeBytes, 
         max: MAX_SIZE_BYTES 
       });
-      throw new HttpsError('failed-precondition', 'File exceeds AI processing size limit');
+      throw new HttpsError('failed-precondition', 'File exceeds size limit');
     }
 
     // Try file-based analysis first (preferred for file uploads)
