@@ -3,7 +3,7 @@
  * Handles file upload, download, and management operations
  */
 
-import { FileUploadConfig, FileMetadata, validateFile } from "@shared/index";
+import { FileUploadConfig, FileMetadata, validateFile, AI_PROCESSING_LIMITS } from "@shared/index";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 
@@ -30,6 +30,11 @@ export async function uploadFileToStorage(config: FileUploadConfig): Promise<Fil
     // Convert base64 to buffer
     const base64Data = fileData.split(',')[1] || fileData; // Remove data:mime;base64, prefix if exists
     const buffer = Buffer.from(base64Data, 'base64');
+
+    // Enforce AI-specific size limit early (may be lower than generic validation)
+    if (buffer.length > AI_PROCESSING_LIMITS.maxAIFileSizeBytes) {
+      throw new Error(`File too large for AI processing. Max: ${Math.round(AI_PROCESSING_LIMITS.maxAIFileSizeBytes/1024/1024)}MB`);
+    }
 
     // Upload file to storage
     await file.save(buffer, {
@@ -136,4 +141,3 @@ export async function deleteFileFromStorage(storagePath: string): Promise<void> 
     throw error;
   }
 }
-

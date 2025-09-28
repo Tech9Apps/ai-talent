@@ -21,7 +21,8 @@ import {
   CVAnalysis,
   JobAnalysis,
 } from "../../../../shared/types/aiTypes";
-import { analyzeFileWithOpenAI, downloadStorageFile } from "../../services/openaiService";
+import { analyzeCVWithOpenAI, analyzeJobWithOpenAI, analyzeStorageFileWithOpenAI, analyzeFileWithOpenAI } from "../../services/openaiService";
+import { AI_PROCESSING_LIMITS } from "@shared/index";
 
 /**
  * Stores AI analysis results in Firestore
@@ -116,8 +117,7 @@ async function handleAIProcessing(
       structuredData: true,
       userId,
       fileId,
-      uploadType,
-      timestamp: new Date().toISOString(),
+      uploadType
     });
 
     // Get file information from Firestore
@@ -140,20 +140,52 @@ async function handleAIProcessing(
       throw new HttpsError("invalid-argument", "File storage path not found");
     }
 
-    // Attempt direct file analysis first
+    // Get file information and validate size
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(storagePath);
+    const [metadata] = await file.getMetadata();
+    const sizeBytes = Number(metadata.size || 0);
+    const MAX_SIZE_BYTES = AI_PROCESSING_LIMITS.maxAIFileSizeBytes; 
+    
+    logger.info("File metadata retrieved", {
+      structuredData: true,
+      fileName: metadata.name,
+      sizeBytes,
+      contentType: metadata.contentType,
+    });
+    
+    if (sizeBytes > MAX_SIZE_BYTES) {
+      logger.error('File too large for AI processing', { 
+        structuredData: true, 
+        userId, 
+        fileId, 
+        sizeBytes, 
+        max: MAX_SIZE_BYTES 
+      });
+      throw new HttpsError('failed-precondition', 'File exceeds AI processing size limit');
+    }
+
+    // Try file-based analysis first (preferred for file uploads)
     let analysis: AIAnalysisResult;
-    let usedFileMode = false;
+    let processingMethod = 'unknown';
+    
     try {
-      const { buffer, fileName } = await downloadStorageFile(storagePath);
-      const parsed = await analyzeFileWithOpenAI(buffer, fileName, uploadType === 'cv' ? 'cv' : 'job');
-      // Map parsed generic object to types
+      const parsed = await analyzeStorageFileWithOpenAI(
+        storagePath, 
+        metadata.name || 'uploaded_file', 
+        uploadType === 'cv' ? 'cv' : 'job'
+      );
+      
+      processingMethod = 'file-based-stream';
+      
+      // Map parsed results to proper analysis format
       if (uploadType === 'cv') {
         analysis = {
           jobHistory: parsed.jobHistory || [],
           technologies: parsed.technologies || [],
           experienceYears: parsed.experienceYears || 0,
           education: parsed.education || [],
-          warnings: []
+          warnings: parsed.warnings || []
         } as CVAnalysis;
         if (parsed.name) (analysis as CVAnalysis).name = parsed.name;
         if (parsed.email) (analysis as CVAnalysis).email = parsed.email;
@@ -173,10 +205,70 @@ async function handleAIProcessing(
         if (parsed.location) (analysis as JobAnalysis).location = parsed.location;
         if (parsed.salary) (analysis as JobAnalysis).salary = parsed.salary;
       }
-      usedFileMode = true;
-    } catch (fileModeError) {
-      logger.error('File-mode AI failed (no fallback enabled)', { structuredData: true, error: fileModeError instanceof Error ? fileModeError.message : String(fileModeError) });
-      throw new HttpsError('internal', 'AI file analysis failed');
+      
+    } catch (fileAnalysisError) {
+      logger.warn("File-based analysis failed, trying buffer fallback", {
+        structuredData: true,
+        error: fileAnalysisError instanceof Error ? fileAnalysisError.message : String(fileAnalysisError)
+      });
+      
+      try {
+        const [buffer] = await file.download();
+        
+        const parsed = await analyzeFileWithOpenAI(
+          buffer, 
+          metadata.name || 'uploaded_file', 
+          uploadType === 'cv' ? 'cv' : 'job'
+        );
+        
+        processingMethod = 'file-based-buffer';
+        
+        // Map parsed results to proper analysis format
+        if (uploadType === 'cv') {
+          analysis = {
+            jobHistory: parsed.jobHistory || [],
+            technologies: parsed.technologies || [],
+            experienceYears: parsed.experienceYears || 0,
+            education: parsed.education || [],
+            warnings: parsed.warnings || []
+          } as CVAnalysis;
+          if (parsed.name) (analysis as CVAnalysis).name = parsed.name;
+          if (parsed.email) (analysis as CVAnalysis).email = parsed.email;
+          if (parsed.phone) (analysis as CVAnalysis).phone = parsed.phone;
+          if (parsed.location) (analysis as CVAnalysis).location = parsed.location;
+          if (parsed.summary) (analysis as CVAnalysis).summary = parsed.summary;
+        } else {
+          analysis = {
+            title: parsed.title || 'Unknown Position',
+            requiredSkills: parsed.requiredSkills || [],
+            experienceRequired: parsed.experienceRequired || 0,
+            description: parsed.description || '',
+            requirements: parsed.requirements || [],
+            warnings: parsed.warnings || []
+          } as JobAnalysis;
+          if (parsed.company) (analysis as JobAnalysis).company = parsed.company;
+          if (parsed.location) (analysis as JobAnalysis).location = parsed.location;
+          if (parsed.salary) (analysis as JobAnalysis).salary = parsed.salary;
+        }
+        
+      } catch (bufferAnalysisError) {
+        logger.warn("Buffer-based analysis also failed, trying text fallback", {
+          structuredData: true,
+          error: bufferAnalysisError instanceof Error ? bufferAnalysisError.message : String(bufferAnalysisError)
+        });
+        
+        // Final fallback: download again and convert to text
+        const [textBuffer] = await file.download();
+        const fileText = textBuffer.toString('utf8');
+        
+        if (uploadType === 'cv') {
+          analysis = await analyzeCVWithOpenAI(fileText);
+        } else {
+          analysis = await analyzeJobWithOpenAI(fileText);
+        }
+        
+        processingMethod = 'text-fallback';
+      }
     }
 
     // Store results
@@ -195,12 +287,9 @@ async function handleAIProcessing(
 
     logger.info("AI analysis completed successfully", {
       structuredData: true,
-      userId,
-      fileId,
       uploadType,
       warningsCount: "warnings" in analysis ? analysis.warnings.length : 0,
-      mode: usedFileMode ? 'file' : 'text-fallback',
-      timestamp: new Date().toISOString(),
+      processingMethod
     });
 
     return response;
@@ -212,11 +301,7 @@ async function handleAIProcessing(
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error("AI processing failed", {
       structuredData: true,
-      userId,
-      fileId,
-      uploadType,
-      error: errorMessage,
-      timestamp: new Date().toISOString(),
+      error: errorMessage
     });
 
     throw new HttpsError(
@@ -232,4 +317,7 @@ async function handleAIProcessing(
 export const processFileWithAI = onCall<
   AIAnalysisRequest,
   Promise<AIProcessResponse>
->(withAuthentication(handleAIProcessing));
+>({
+  memory: '512MiB',
+  timeoutSeconds: 120,
+}, withAuthentication(handleAIProcessing));

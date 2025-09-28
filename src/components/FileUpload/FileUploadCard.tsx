@@ -10,7 +10,7 @@ import {
 } from "@mui/material";
 import { CloudUpload, CheckCircle } from "@mui/icons-material";
 import { uploadFile, processFileWithAI, findJobMatches, FunctionsError, getFriendlyErrorMessage, validateFile } from "../../utils/functions";
-import { SUPPORTED_FILE_TYPES } from "../../../shared";
+import { SUPPORTED_FILE_TYPES, AI_PROCESSING_LIMITS } from "../../../shared";
 
 type ProcessStep = {
   id: number;
@@ -43,6 +43,7 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
   ]);
   
   const [isProcessing, setIsProcessing] = useState(false);
+  const currentStepRef = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const updateStep = (stepId: number, status: ProcessStep['status'], message?: string) => {
@@ -70,13 +71,18 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
     try {
       // Validate file first using shared validation
       validateFile(file, type);
+      if (file.size > AI_PROCESSING_LIMITS.maxAIFileSizeBytes) {
+        throw new Error(`File exceeds AI analysis limit (${Math.round(AI_PROCESSING_LIMITS.maxAIFileSizeBytes/1024/1024)}MB)`);
+      }
       
       // Step 1: Upload file
+      currentStepRef.current = 1;
       updateStep(1, 'processing', 'Uploading your file...');
       const result = await uploadFile(file, type);
       updateStep(1, 'completed', 'File uploaded successfully');
       
       // Step 2: AI Analysis
+      currentStepRef.current = 2;
       updateStep(2, 'processing', 'Analyzing with AI...');
       const aiResult = await processFileWithAI(result.fileId, type);
       const hasAIWarnings = aiResult.warnings && aiResult.warnings.length > 0;
@@ -87,6 +93,7 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
       );
       
       // Step 3: Find matches (only for CVs)
+      currentStepRef.current = 3;
       updateStep(3, 'processing', 'Finding job matches...');
       if (type === 'cv') {
         const matchResult = await findJobMatches(result.fileId);
@@ -106,10 +113,15 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
     } catch (error: unknown) {
       console.error("Upload error:", error);
       
-      // Find which step is currently processing and mark it as error
+      // Mark the current step (or the last processing) as error
       const processingStep = steps.find(step => step.status === 'processing');
-      if (processingStep) {
-        updateStep(processingStep.id, 'error', `${processingStep.name} failed`);
+      const failingStepId = currentStepRef.current || processingStep?.id;
+      if (failingStepId) {
+        let failMessage = 'Step failed';
+        if (failingStepId === 1) failMessage = 'File upload failed';
+        if (failingStepId === 2) failMessage = 'AI analysis failed';
+        if (failingStepId === 3) failMessage = 'Matching step failed';
+        updateStep(failingStepId, 'error', failMessage);
       }
       
       // Use improved error handling with more context
@@ -119,6 +131,10 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
         errorMessage = error.message;
       } else {
         errorMessage = getFriendlyErrorMessage(error);
+      }
+      // Normalize internal generic codes
+      if (errorMessage === 'internal') {
+        errorMessage = 'AI processing failed. Please try again or use a smaller/cleaner file.';
       }
       
       // Add context about what failed if it's a generic error
@@ -223,7 +239,7 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
                   )}
                   {step.status === 'error' && (
                     <Alert severity="error">
-                      {step.name} failed
+                      {step.message || `${step.name} failed`}
                     </Alert>
                   )}
                 </Box>

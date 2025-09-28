@@ -23,3 +23,8 @@ export const FILE_VALIDATION_CONFIG = {
     'text/plain',
   ],
 } as const;
+
+// Max size specifically allowed for AI processing (can be stricter than general upload)
+export const AI_PROCESSING_LIMITS = {
+  maxAIFileSizeBytes: 8 * 1024 * 1024, // 8MB hard limit for AI pipeline
+};
