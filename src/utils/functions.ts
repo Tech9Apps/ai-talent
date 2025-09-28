@@ -255,7 +255,7 @@ export function getUserFilesFromFirestore(): void {
 export async function processFileWithAI(
   fileId: string,
   uploadType: 'cv' | 'jobDescription'
-): Promise<unknown> {
+): Promise<{ success: boolean; warnings: string[]; [key: string]: unknown }> {
   try {
     const processAI = httpsCallable(functions, "processFileWithAI");
     
@@ -264,7 +264,7 @@ export async function processFileWithAI(
       uploadType
     });
 
-    const data = result.data as { success: boolean; message?: string };
+    const data = result.data as { success: boolean; message?: string; warnings?: string[] };
     
     if (!data.success) {
       throw new FunctionsError(
@@ -274,7 +274,7 @@ export async function processFileWithAI(
       );
     }
 
-    return result.data;
+    return { ...data, warnings: data.warnings || [] };
   } catch (error: unknown) {
     console.error('AI processing error:', error);
     
@@ -297,7 +297,7 @@ export async function processFileWithAI(
  */
 export async function findJobMatches(
   fileId: string
-): Promise<unknown> {
+): Promise<{ success: boolean; warnings: string[]; totalMatches?: number; [key: string]: unknown }> {
   try {
     const findMatches = httpsCallable(functions, "findJobMatches");
     
@@ -305,7 +305,7 @@ export async function findJobMatches(
       fileId
     });
 
-    const data = result.data as { success: boolean; message?: string };
+    const data = result.data as { success: boolean; message?: string; warnings?: string[]; totalMatches?: number };
 
     if (!data.success) {
       throw new FunctionsError(
@@ -315,7 +315,7 @@ export async function findJobMatches(
       );
     }
 
-    return result.data;
+    return { ...data, warnings: data.warnings || [] };
   } catch (error: unknown) {
     console.error('Job matching error:', error);
     

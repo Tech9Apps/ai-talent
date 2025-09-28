@@ -9,31 +9,11 @@ import {
   withAuthentication,
   AuthenticatedContext,
 } from "../../middleware/auth";
-
-interface JobMatchRequest {
-  fileId: string;
-  cvAnalysisId?: string;
-}
-
-interface JobMatch {
-  jobId: string;
-  jobTitle: string;
-  company: string;
-  matchScore: number;
-  matchedSkills: string[];
-  missingSkills: string[];
-  experienceMatch: boolean;
-  location?: string;
-}
-
-interface JobMatchResponse {
-  success: boolean;
-  message: string;
-  fileId: string;
-  matches: JobMatch[];
-  totalMatches: number;
-  processedAt: string;
-}
+import {
+  JobMatchRequest,
+  JobMatch,
+  JobMatchResponse,
+} from '../../../../shared/types/aiTypes';
 
 /**
  * Main handler for job matching (placeholder)
@@ -92,6 +72,7 @@ async function handleJobMatching(
       fileId,
       matches: placeholderMatches,
       totalMatches: placeholderMatches.length,
+      warnings: [], // Always empty - no warnings for matching
       processedAt: new Date().toISOString(),
     };
 

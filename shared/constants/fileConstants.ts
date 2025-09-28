@@ -7,7 +7,7 @@
  * Supported file types for upload
  */
 export const SUPPORTED_FILE_TYPES = {
-  cv: ['.pdf', '.doc', '.docx'],
+  cv: ['.pdf', '.doc', '.docx', '.txt'],
   jobDescription: ['.pdf', '.doc', '.docx', '.txt'],
 } as const;
 

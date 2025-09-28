@@ -15,7 +15,7 @@ import { SUPPORTED_FILE_TYPES } from "../../../shared";
 type ProcessStep = {
   id: number;
   name: string;
-  status: 'pending' | 'processing' | 'completed' | 'error';
+  status: 'pending' | 'processing' | 'completed' | 'warning' | 'error';
   message?: string;
 };
 
@@ -78,13 +78,18 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
       
       // Step 2: AI Analysis
       updateStep(2, 'processing', 'Analyzing with AI...');
-      await processFileWithAI(result.fileId, type);
-      updateStep(2, 'completed', 'AI analysis completed');
+      const aiResult = await processFileWithAI(result.fileId, type);
+      const hasAIWarnings = aiResult.warnings && aiResult.warnings.length > 0;
+      updateStep(2, hasAIWarnings ? 'warning' : 'completed', 
+        hasAIWarnings 
+          ? `AI analysis completed with ${aiResult.warnings.length} warnings`
+          : 'AI analysis completed'
+      );
       
       // Step 3: Find matches (only for CVs)
       updateStep(3, 'processing', 'Finding job matches...');
       if (type === 'cv') {
-        const matchResult = await findJobMatches(result.fileId) as { totalMatches?: number };
+        const matchResult = await findJobMatches(result.fileId);
         updateStep(3, 'completed', `Found ${matchResult.totalMatches || 0} job matches`);
       } else {
         // For job descriptions, just mark as completed without actual matching
@@ -101,10 +106,10 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
     } catch (error: unknown) {
       console.error("Upload error:", error);
       
-      // Find which step failed and mark it as error
-      const currentStep = steps.find(step => step.status === 'processing');
-      if (currentStep) {
-        updateStep(currentStep.id, 'error');
+      // Find which step is currently processing and mark it as error
+      const processingStep = steps.find(step => step.status === 'processing');
+      if (processingStep) {
+        updateStep(processingStep.id, 'error', `${processingStep.name} failed`);
       }
       
       // Use improved error handling with more context
@@ -180,7 +185,7 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
           </Box>
 
           {/* Process Steps */}
-          {(isProcessing || steps.some(step => step.status === 'completed')) && (
+          {(isProcessing || steps.some(step => step.status === 'completed' || step.status === 'warning')) && (
             <Box sx={{ mt: 2 }}>
               {steps.map((step) => (
                 <Box key={step.id} sx={{ mb: 1 }}>
@@ -206,6 +211,14 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
                       icon={<CheckCircle />}
                     >
                       {step.message || `${step.name} completed`}
+                    </Alert>
+                  )}
+                  {step.status === 'warning' && (
+                    <Alert 
+                      severity="warning"
+                      icon={<CheckCircle />}
+                    >
+                      {step.message || `${step.name} completed with warnings`}
                     </Alert>
                   )}
                   {step.status === 'error' && (
