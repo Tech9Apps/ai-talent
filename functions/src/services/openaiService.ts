@@ -1,7 +1,6 @@
 import OpenAI from "openai";
 import * as logger from "firebase-functions/logger";
 import { CVAnalysis, JobAnalysis } from "../../../shared/types/aiTypes";
-import * as admin from "firebase-admin";
 import { extractTextFromBuffer, extractTextFromStorageFile } from "../utils/storage";
 
 

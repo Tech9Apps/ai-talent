@@ -96,6 +96,22 @@ export interface GetFilesResponse {
 }
 
 /**
+ * Delete CV request data (client to Functions)
+ */
+export interface DeleteCVRequestData {
+  fileId: string;
+}
+
+/**
+ * Delete CV response (Functions to client)
+ */
+export interface DeleteCVResponse {
+  success: boolean;
+  message: string;
+  deletedFileId?: string;
+}
+
+/**
  * Firebase Timestamp type (to avoid importing firebase-admin in client)
  */
 interface FirebaseTimestamp {

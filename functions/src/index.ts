@@ -16,6 +16,7 @@ setGlobalOptions({ maxInstances: 10 });
 // Export file-related functions  
 export { processUploadedFile } from "./functions/file/uploadFile";
 export { getUserFiles } from "./functions/file/getFiles";
+export { deleteCV } from "./functions/file/deleteCV";
 
 // Export AI processing functions
 export { processFileWithAI } from "./functions/ai/processFileWithAI";
