@@ -50,7 +50,6 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
 }) => {
   // Get user files data
   const { cvFile, loading: filesLoading } = useUserFiles();
-  console.log("User CV file:", cvFile);
 
   // Get accepted file types from shared constants
   const acceptedFiles = SUPPORTED_FILE_TYPES[type].join(",");
@@ -82,7 +81,6 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
 
   // Dialog state for CV replacement confirmation
   const [showReplaceDialog, setShowReplaceDialog] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const updateStep = (
     stepId: number,
@@ -97,22 +95,21 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
   };
 
   const handleFileSelect = () => {
+    // If this is CV upload and user already has a CV, show confirmation dialog first
+    if (type === "cv" && cvFile && !isProcessing) {
+      setShowReplaceDialog(true);
+      return;
+    }
+
+    // Otherwise, open file selector directly
     fileInputRef.current?.click();
   };
 
   const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-    forceReplace = false
+    event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    // If this is CV upload and user already has a CV, show confirmation dialog
-    if (type === "cv" && cvFile && !forceReplace) {
-      setPendingFile(file);
-      setShowReplaceDialog(true);
-      return;
-    }
 
     await processFileUpload(file);
   };
@@ -231,21 +228,14 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
     }
   };
 
-  const handleConfirmReplace = async () => {
-    if (pendingFile) {
-      setShowReplaceDialog(false);
-      await processFileUpload(pendingFile);
-      setPendingFile(null);
-    }
+  const handleConfirmReplace = () => {
+    fileInputRef.current?.click();
+
+    setShowReplaceDialog(false);
   };
 
   const handleCancelReplace = () => {
     setShowReplaceDialog(false);
-    setPendingFile(null);
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   };
 
   return (
@@ -261,9 +251,9 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
           boxShadow: "none",
           transition: "all 0.2s ease-in-out",
         }}
-        onClick={!isProcessing ? handleFileSelect : undefined}
+        onClick={!isProcessing ? () => handleFileSelect() : undefined}
       >
-        <CardActionArea>
+        <CardActionArea disabled={filesLoading}>
           <CardContent
             sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}
           >
@@ -295,7 +285,7 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
             </Box>
 
             {/* Show existing CV if it exists and this is a CV upload card */}
-            {type === "cv" && cvFile && !filesLoading && (
+            {type === "cv" && cvFile && !filesLoading && !isProcessing && (
               <Box
                 sx={{
                   mt: 1,
