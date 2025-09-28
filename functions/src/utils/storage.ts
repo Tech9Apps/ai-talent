@@ -2,8 +2,8 @@
  * Firebase Storage utilities
  * Handles file upload, download, and management operations
  */
-
-import { FileUploadConfig, FileMetadata, validateFile } from "@shared/index";
+import * as path from "path";
+import { FileUploadConfig, FileMetadata, validateFile, FILE_VALIDATION_CONFIG } from "@shared/index";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 
@@ -30,6 +30,11 @@ export async function uploadFileToStorage(config: FileUploadConfig): Promise<Fil
     // Convert base64 to buffer
     const base64Data = fileData.split(',')[1] || fileData; // Remove data:mime;base64, prefix if exists
     const buffer = Buffer.from(base64Data, 'base64');
+
+    // Enforce file size limit
+    if (buffer.length > FILE_VALIDATION_CONFIG.maxSizeBytes) {
+      throw new Error(`File too large. Max: ${Math.round(FILE_VALIDATION_CONFIG.maxSizeBytes/1024/1024)}MB`);
+    }
 
     // Upload file to storage
     await file.save(buffer, {
@@ -134,5 +139,80 @@ export async function deleteFileFromStorage(storagePath: string): Promise<void> 
     });
 
     throw error;
+  }
+}
+
+// Función para extraer texto de archivo en Firebase Storage
+export async function extractTextFromStorageFile(
+  storagePath: string,
+  originalName: string
+): Promise<string> {
+  try {
+    logger.info("Downloading file from storage for text extraction", {
+      structuredData: true,
+      storagePath,
+      originalName,
+    });
+
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(storagePath);
+    const [buffer] = await file.download();
+
+    logger.info("File downloaded from storage", {
+      structuredData: true,
+      storagePath,
+      downloadedSize: buffer.length,
+    });
+
+    return await extractTextFromBuffer(buffer, originalName);
+  } catch (error) {
+    logger.error("Storage file text extraction failed", {
+      structuredData: true,
+      storagePath,
+      originalName,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
+
+// Función para extraer texto de archivos .txt
+export async function extractTextFromBuffer(
+  buffer: Buffer,
+  fileName: string
+): Promise<string> {
+  const fileExtension = path.extname(fileName).toLowerCase();
+
+  logger.info("Extracting text from file", {
+    structuredData: true,
+    fileName,
+    fileExtension,
+    size: buffer.length,
+  });
+
+  try {
+    if (fileExtension !== ".txt") {
+      throw new Error(`Unsupported file type: ${fileExtension}. Only .txt files are supported.`);
+    }
+
+    const textContent = buffer.toString("utf-8");
+    logger.info("Text file content extracted", {
+      structuredData: true,
+      fileName,
+      textLength: textContent.length,
+    });
+    return textContent;
+  } catch (error) {
+    logger.error("Text extraction failed", {
+      structuredData: true,
+      fileName,
+      fileExtension,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new Error(
+      `Failed to extract text from file: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
   }
 }

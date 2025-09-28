@@ -245,3 +245,88 @@ export async function getUserFiles(
 export function getUserFilesFromFirestore(): void {
   throw new Error('Not implemented - use Firestore SDK directly in your component');
 }
+
+/**
+ * Processes uploaded file with AI analysis
+ * @param fileId - ID of the uploaded file
+ * @param uploadType - Type of upload ('cv' or 'jobDescription')
+ * @returns Promise with AI analysis results
+ */
+export async function processFileWithAI(
+  fileId: string,
+  uploadType: 'cv' | 'jobDescription'
+): Promise<{ success: boolean; warnings: string[]; [key: string]: unknown }> {
+  try {
+    const processAI = httpsCallable(functions, "processFileWithAI");
+    
+    const result = await processAI({
+      fileId,
+      uploadType
+    });
+
+    const data = result.data as { success: boolean; message?: string; warnings?: string[] };
+    
+    if (!data.success) {
+      throw new FunctionsError(
+        data.message || 'AI processing failed',
+        'AI_PROCESSING_FAILED',
+        result.data
+      );
+    }
+
+    return { ...data, warnings: data.warnings || [] };
+  } catch (error: unknown) {
+    console.error('AI processing error:', error);
+    
+    if (error instanceof FunctionsError) {
+      throw error;
+    }
+
+    throw new FunctionsError(
+      getFriendlyErrorMessage(error),
+      'AI_PROCESSING_ERROR',
+      error
+    );
+  }
+}
+
+/**
+ * Finds job matches for uploaded CV
+ * @param fileId - ID of the uploaded CV file
+ * @returns Promise with job matches
+ */
+export async function findJobMatches(
+  fileId: string
+): Promise<{ success: boolean; warnings: string[]; totalMatches?: number; [key: string]: unknown }> {
+  try {
+    const findMatches = httpsCallable(functions, "findJobMatches");
+    
+    const result = await findMatches({
+      fileId
+    });
+
+    const data = result.data as { success: boolean; message?: string; warnings?: string[]; totalMatches?: number };
+
+    if (!data.success) {
+      throw new FunctionsError(
+        data.message || 'Job matching failed',
+        'JOB_MATCHING_FAILED',
+        result.data
+      );
+    }
+
+    return { ...data, warnings: data.warnings || [] };
+  } catch (error: unknown) {
+    console.error('Job matching error:', error);
+    
+    if (error instanceof FunctionsError) {
+      throw error;
+    }
+
+    throw new FunctionsError(
+      getFriendlyErrorMessage(error),
+      'JOB_MATCHING_ERROR',
+      error
+    );
+  }
+}

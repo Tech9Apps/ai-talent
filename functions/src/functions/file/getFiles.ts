@@ -25,7 +25,6 @@ async function handleGetFiles(
     uploadType = 'all', 
     limit = 20, 
     startAfter, 
-    includeDownloadUrls = false 
   } = request.data || {};
   const { userId } = context;
 
@@ -35,7 +34,6 @@ async function handleGetFiles(
       userId,
       uploadType,
       limit,
-      includeDownloadUrls,
       timestamp: new Date().toISOString(),
     });
 
@@ -93,25 +91,6 @@ async function handleGetFiles(
         processed: data.processed || false,
         status: data.status || 'unknown',
       };
-
-      // Include download URL if requested (requires additional Storage API call)
-      if (includeDownloadUrls && data.storagePath) {
-        try {
-          const file = admin.storage().bucket().file(data.storagePath);
-          const [downloadURL] = await file.getSignedUrl({
-            action: 'read',
-            expires: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
-          });
-          fileInfo.downloadURL = downloadURL;
-        } catch (urlError) {
-          logger.warn("Failed to generate download URL", {
-            structuredData: true,
-            fileId: doc.id,
-            storagePath: data.storagePath,
-            error: urlError instanceof Error ? urlError.message : String(urlError),
-          });
-        }
-      }
 
       files.push(fileInfo);
     }

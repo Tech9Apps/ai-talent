@@ -8,6 +8,7 @@ export * from './constants/fileConstants';
 
 // Export types
 export * from './types/fileTypes';
+export * from './types/aiTypes';
 
 // Export utilities
 export * from './utils/validation';
