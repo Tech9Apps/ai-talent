@@ -45,10 +45,7 @@ export async function uploadFileToStorage(config: FileUploadConfig): Promise<Fil
       },
     });
 
-    // Make file publicly readable (optional - adjust based on your security needs)
-    // await file.makePublic();
-
-    // Get download URL
+    // Get download URL using signed URL
     const [downloadURL] = await file.getSignedUrl({
       action: 'read',
       expires: '03-01-2030', // Long expiry for permanent access
@@ -79,15 +76,34 @@ export async function uploadFileToStorage(config: FileUploadConfig): Promise<Fil
     return metadata;
 
   } catch (error) {
-    logger.error("Error uploading file to storage", {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorDetails = {
       structuredData: true,
       userId: config.userId,
       fileName: config.fileName,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMessage,
       timestamp: new Date().toISOString(),
-    });
+    };
 
-    throw error;
+    logger.error("Error uploading file to storage", errorDetails);
+
+    // Create more specific error messages based on the error type
+    let specificErrorMessage = "Failed to upload file to storage";
+    
+    if (errorMessage.includes('permission') || errorMessage.includes('Permission')) {
+      specificErrorMessage = "Storage permission denied. Please contact support.";
+    } else if (errorMessage.includes('quota') || errorMessage.includes('Quota')) {
+      specificErrorMessage = "Storage quota exceeded. Please contact support.";
+    } else if (errorMessage.includes('network') || errorMessage.includes('Network')) {
+      specificErrorMessage = "Network error while uploading file. Please try again.";
+    } else if (errorMessage.includes('bucket') || errorMessage.includes('Bucket')) {
+      specificErrorMessage = "Storage configuration error. Please contact support.";
+    } else if (errorMessage.includes('invalid') || errorMessage.includes('Invalid')) {
+      specificErrorMessage = "Invalid file data. Please check your file and try again.";
+    }
+
+    // Throw a new error with the specific message
+    throw new Error(specificErrorMessage);
   }
 }
 

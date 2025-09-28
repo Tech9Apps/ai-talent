@@ -63,15 +63,19 @@ export function getFriendlyErrorMessage(error: unknown): string {
       case 'permission-denied':
         return 'You do not have permission to perform this action';
       case 'invalid-argument':
-        return 'Invalid file data. Please check your file and try again';
+        return firebaseError.message || 'Invalid file data. Please check your file and try again';
       case 'resource-exhausted':
-        return 'Too many requests. Please wait a moment and try again';
+        return 'Storage quota exceeded or too many requests. Please wait a moment and try again';
       case 'deadline-exceeded':
         return 'Upload timeout. Please check your connection and try again';
       case 'internal':
-        return 'Server error occurred. Please try again later';
+        return firebaseError.message || 'Server error occurred. Please try again later';
       case 'unavailable':
         return 'Service temporarily unavailable. Please try again';
+      case 'cancelled':
+        return 'Upload was cancelled. Please try again';
+      case 'failed-precondition':
+        return 'Upload failed due to system requirements. Please try again';
       default:
         return firebaseError.message || 'An unexpected error occurred';
     }
@@ -82,6 +86,23 @@ export function getFriendlyErrorMessage(error: unknown): string {
   }
 
   if (error instanceof Error) {
+    // Handle specific error patterns
+    const message = error.message.toLowerCase();
+    if (message.includes('network') || message.includes('connection')) {
+      return 'Network error. Please check your internet connection and try again';
+    }
+    if (message.includes('timeout')) {
+      return 'Upload timeout. Please try again';
+    }
+    if (message.includes('cors')) {
+      return 'CORS error. Please refresh the page and try again';
+    }
+    if (message.includes('file too large') || message.includes('size')) {
+      return 'File is too large. Maximum size is 10MB';
+    }
+    if (message.includes('unsupported') || message.includes('format')) {
+      return 'Unsupported file format. Please use PDF, DOC, or DOCX files';
+    }
     return error.message;
   }
 

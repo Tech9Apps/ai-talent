@@ -3,7 +3,7 @@
  * Handles file upload, processing, and management
  */
 
-import { onCall, CallableRequest } from "firebase-functions/v2/https";
+import { onCall, CallableRequest, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import {
@@ -19,6 +19,7 @@ import {
   FileUploadRequestData,
   FileUploadResponse
 } from "../../../../shared";
+import { ValidationError } from "../../../../shared/utils/validation";
 
 /**
  * Updates user statistics after successful upload
@@ -146,44 +147,115 @@ async function handleFileUpload(
   const { fileData, fileName, fileType, uploadType } = request.data;
   const { userId } = context;
 
-  // Validate required data
-  if (!fileData || !fileName || !uploadType) {
-    throw new Error(
-      "Missing required file data: fileData, fileName, and uploadType are required"
-    );
-  }
-
-  if (!["cv", "jobDescription"].includes(uploadType)) {
-    throw new Error("Invalid uploadType. Must be 'cv' or 'jobDescription'");
-  }
-
-  logger.info("Processing file upload", {
-    structuredData: true,
-    userId,
-    fileName,
-    fileType: fileType || "unknown",
-    uploadType,
-    fileSize: fileData?.length || 0,
-    timestamp: new Date().toISOString(),
-  });
-
   try {
-    // 1. Upload file to Firebase Storage
-    const uploadConfig: FileUploadConfig = {
+    // Validate required data
+    if (!fileData || !fileName || !uploadType) {
+      throw new HttpsError(
+        'invalid-argument',
+        "Missing required file data: fileData, fileName, and uploadType are required"
+      );
+    }
+
+    if (!["cv", "jobDescription"].includes(uploadType)) {
+      throw new HttpsError(
+        'invalid-argument',
+        "Invalid uploadType. Must be 'cv' or 'jobDescription'"
+      );
+    }
+
+    logger.info("Processing file upload", {
+      structuredData: true,
       userId,
       fileName,
-      fileType: fileType || "application/octet-stream",
+      fileType: fileType || "unknown",
       uploadType,
-      fileData,
-    };
+      fileSize: fileData?.length || 0,
+      timestamp: new Date().toISOString(),
+    });
 
-    const fileMetadata = await uploadFileToStorage(uploadConfig);
+    // 1. Upload file to Firebase Storage
+    let fileMetadata: FileMetadata;
+    try {
+      const uploadConfig: FileUploadConfig = {
+        userId,
+        fileName,
+        fileType: fileType || "application/octet-stream",
+        uploadType,
+        fileData,
+      };
+
+      fileMetadata = await uploadFileToStorage(uploadConfig);
+    } catch (storageError) {
+      const errorMessage = storageError instanceof Error ? storageError.message : String(storageError);
+      logger.error("Storage upload failed", {
+        structuredData: true,
+        userId,
+        fileName,
+        error: errorMessage,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Determine error type and throw appropriate HttpsError
+      if (errorMessage.includes('permission') || errorMessage.includes('Permission')) {
+        throw new HttpsError('permission-denied', 'Storage permission denied. Please contact support.');
+      } else if (errorMessage.includes('quota') || errorMessage.includes('Quota')) {
+        throw new HttpsError('resource-exhausted', 'Storage quota exceeded. Please contact support.');
+      } else if (errorMessage.includes('network') || errorMessage.includes('Network')) {
+        throw new HttpsError('unavailable', 'Network error while uploading. Please check your connection and try again.');
+      } else if (errorMessage.includes('invalid') || errorMessage.includes('Invalid')) {
+        throw new HttpsError('invalid-argument', 'Invalid file data. Please verify your file is not corrupted and try again.');
+      } else if (errorMessage.includes('Unsupported file type') || errorMessage.includes('FILE_TOO_LARGE')) {
+        throw new HttpsError('invalid-argument', errorMessage);
+      } else {
+        throw new HttpsError('internal', 'Failed to upload file to storage. Please try again later.');
+      }
+    }
 
     // 2. Store file record in Firestore
-    const fileId = await storeFileRecord(fileMetadata, userId);
+    let fileId: string;
+    try {
+      fileId = await storeFileRecord(fileMetadata, userId);
+    } catch (firestoreError) {
+      const errorMessage = firestoreError instanceof Error ? firestoreError.message : String(firestoreError);
+      logger.error("Failed to store file record", {
+        structuredData: true,
+        userId,
+        fileName,
+        error: errorMessage,
+        timestamp: new Date().toISOString(),
+      });
 
-    // 3. Update user statistics
-    await updateUserStatistics(userId, uploadType);
+      // Clean up uploaded file if Firestore fails
+      try {
+        await admin.storage().bucket().file(fileMetadata.storagePath).delete();
+        logger.info("Cleaned up uploaded file after Firestore failure", {
+          structuredData: true,
+          storagePath: fileMetadata.storagePath,
+        });
+      } catch (cleanupError) {
+        logger.warn("Failed to clean up file after Firestore error", {
+          structuredData: true,
+          storagePath: fileMetadata.storagePath,
+          cleanupError: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+        });
+      }
+
+      throw new HttpsError('internal', 'Failed to save file information. Please try again later.');
+    }
+
+    // 3. Update user statistics (non-critical)
+    try {
+      await updateUserStatistics(userId, uploadType);
+    } catch (statsError) {
+      // Log but don't fail the upload for statistics errors
+      logger.warn("Failed to update user statistics", {
+        structuredData: true,
+        userId,
+        uploadType,
+        error: statsError instanceof Error ? statsError.message : String(statsError),
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     // 4. Future: Here you would typically:
     // - Extract text from PDF/DOC files
@@ -212,17 +284,30 @@ async function handleFileUpload(
     });
 
     return response;
+
   } catch (error) {
-    logger.error("Error processing file upload", {
+    // If it's already an HttpsError, re-throw it
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+
+    // Handle ValidationError from shared validation
+    if (error instanceof ValidationError) {
+      throw new HttpsError('invalid-argument', error.message);
+    }
+
+    // Handle other errors
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error("Unexpected error processing file upload", {
       structuredData: true,
       userId,
       fileName,
       uploadType,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMessage,
       timestamp: new Date().toISOString(),
     });
 
-    throw error;
+    throw new HttpsError('internal', 'An unexpected error occurred while processing your file. Please try again later.');
   }
 }
 

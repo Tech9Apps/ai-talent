@@ -63,7 +63,7 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
     } catch (error: unknown) {
       console.error("Upload error:", error);
       
-      // Use improved error handling
+      // Use improved error handling with more context
       let errorMessage: string;
       
       if (error instanceof FunctionsError) {
@@ -72,7 +72,19 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
         errorMessage = getFriendlyErrorMessage(error);
       }
       
+      // Add context about what failed if it's a generic error
+      if (errorMessage === "An unexpected error occurred") {
+        errorMessage = `Failed to upload ${file.name}. Please check your file and try again.`;
+      } else if (errorMessage === "Server error occurred. Please try again later") {
+        errorMessage = `Failed to process ${file.name}. The file may be corrupted or the server is experiencing issues. Please try again later.`;
+      }
+      
       setError(errorMessage);
+      
+      // Reset file input on error
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     } finally {
       setLoading(false);
     }
