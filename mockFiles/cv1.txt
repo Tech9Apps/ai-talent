@@ -1,0 +1,23 @@
+Jason Hume González
+Ingeniero de Software con sólida experiencia en el desarrollo de aplicaciones web y móviles, especializado en .NET, Blazor, React, Next.js y Firebase. Conocido por combinar un enfoque técnico fuerte con visión de negocio, especialmente en finanzas personales, fintech, contratación de servicios y plataformas de pagos.
+
+Experiencia Laboral
+
+Tech9 / Prestige Financial Services (PFS) – Software Engineer
+Desarrollo de soluciones empresariales en .NET y Blazor, integración con servicios internos y externos, creación de componentes reutilizables, optimización de pipelines y despliegues en la nube.
+
+Proyectos Personales (Trim Success, Champions, Nubi-Go, Uber-like Services App, etc.)
+Diseño y desarrollo de aplicaciones enfocadas en finanzas personales, trading, inventario, contratación de servicios y growth personal. Enfoque en escalabilidad, experiencia de usuario y modelos de negocio innovadores.
+
+Aplicaciones Freelance / Startups
+Construcción de soluciones en Next.js, React, Firebase, Clerk, MUI, orientadas a autenticación, onboarding, dashboards financieros y módulos de pagos.
+
+Habilidades Clave
+
+Frontend: React, Next.js, Angular, MUI, Radzen, diseño responsivo.
+
+Backend: .NET, C#, Firebase Functions, integración de APIs.
+
+DevOps / Infraestructura: Azure DevOps, Docker, CI/CD pipelines.
+
+Áreas de especialidad: Finanzas, plataformas de pago, growth apps, dashboards interactivos.

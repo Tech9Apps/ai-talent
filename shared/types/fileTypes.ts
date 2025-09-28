@@ -35,11 +35,11 @@ export interface FileMetadata {
   fileName: string;
   originalName: string;
   fileType: string;
+  fileSize: number;
   uploadType: UploadType;
   storagePath: string;
   downloadURL: string;
   uploadedAt: Date;
-  size: number;
 }
 
 /**

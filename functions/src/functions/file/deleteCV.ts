@@ -39,7 +39,7 @@ async function handleDeleteCV(
       throw new HttpsError('not-found', 'CV file data not found');
     }
 
-    if (fileData.fileType !== 'cv') {
+    if (fileData.uploadType !== 'cv') {
       throw new HttpsError('invalid-argument', 'Only CV files can be deleted with this function');
     }
 
