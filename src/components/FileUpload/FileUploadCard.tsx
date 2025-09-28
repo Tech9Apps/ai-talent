@@ -9,8 +9,7 @@ import {
   CardActionArea,
 } from "@mui/material";
 import { CloudUpload } from "@mui/icons-material";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "../../firebase";
+import { uploadFile, FunctionsError, getFriendlyErrorMessage } from "../../utils/functions";
 
 interface FileUploadCardProps {
   type: "cv" | "jobDescription";
@@ -47,24 +46,10 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
     setSuccess(null);
 
     try {
-      // Convert file to base64 for Firebase Functions
-      const fileData = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      // Call Firebase Function
-      const processFile = httpsCallable(functions, "processUploadedFile");
-      const result = await processFile({
-        fileData,
-        fileName: file.name,
-        fileType: file.type,
-        uploadType: type,
-      });
-
-      console.log("File processed:", result.data);
+      // Use the improved upload function with proper error handling
+      const result = await uploadFile(file, type);
+      
+      console.log("File processed:", result);
       setSuccess(`${file.name} uploaded successfully!`);
 
       // Reset file input
@@ -73,8 +58,16 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
       }
     } catch (error: unknown) {
       console.error("Upload error:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to upload file";
+      
+      // Use improved error handling
+      let errorMessage: string;
+      
+      if (error instanceof FunctionsError) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = getFriendlyErrorMessage(error);
+      }
+      
       setError(errorMessage);
     } finally {
       setLoading(false);

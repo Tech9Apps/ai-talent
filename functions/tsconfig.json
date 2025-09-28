@@ -8,10 +8,20 @@
     "outDir": "lib",
     "sourceMap": true,
     "strict": true,
-    "target": "es2017"
+    "target": "es2017",
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "typeRoots": ["./node_modules/@types"]
   },
   "compileOnSave": true,
   "include": [
-    "src"
+    "src",
+    "../shared/**/*"
+  ],
+  "exclude": [
+    "../node_modules/**/*",
+    "../src/**/*",
+    "node_modules/**/*",
+    "lib/**/*"
   ]
 }
