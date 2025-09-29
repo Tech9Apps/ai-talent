@@ -1,4 +1,7 @@
 Job Description – Software Engineer
+Location: Remote
+Salary: Competitive, based on experience
+Company: Tech9 Innovations
 About the Role
 
 We are looking for a Software Engineer to join our growing team. The ideal candidate has strong technical skills in C#/.NET, React, and cloud environments, and enjoys working on scalable applications that impact thousands of users daily.

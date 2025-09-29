@@ -4,22 +4,17 @@ import {
   Typography,
   Box,
   Button,
-  Card,
-  CardContent,
-  Grid,
   Tabs,
   Tab,
-  Chip,
   CircularProgress,
   Alert,
+  Chip,
+  Card,
+  CardContent,
 } from "@mui/material";
-import {
-  ArrowBack,
-  Description,
-  Work,
-  Person,
-  Business,
-} from "@mui/icons-material";
+import { ArrowBack, Description, Work } from "@mui/icons-material";
+import { DataGrid } from "@mui/x-data-grid";
+import type { GridColDef } from "@mui/x-data-grid";
 import { useNavigate } from "react-router-dom";
 import { useAnalyticsData } from "../hooks/useAnalyticsData";
 
@@ -44,6 +39,101 @@ function TabPanel(props: TabPanelProps) {
     </div>
   );
 }
+
+// Column definitions for CVs DataGrid
+const cvColumns: GridColDef[] = [
+  {
+    field: "name",
+    headerName: "Name",
+    width: 200,
+    renderCell: (params) => (
+      <Box sx={{ display: "flex", alignItems: "center" }}>
+        <Description sx={{ mr: 1, color: "primary.main" }} />
+        {params.value}
+      </Box>
+    ),
+  },
+  {
+    field: "location",
+    headerName: "Location",
+    width: 150,
+  },
+  {
+    field: "experienceYears",
+    headerName: "Experience",
+    type: "number",
+    width: 120,
+    renderCell: (params) => (params.value ? `${params.value} years` : " "),
+  },
+  {
+    field: "technologies",
+    headerName: "Technologies",
+    flex: 1,
+    renderCell: (params) => (
+      <Box
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 0.5,
+          alignItems: "center",
+          height: "100%",
+          py: 0.5,
+        }}
+      >
+        {params.value?.map((tech: string, index: number) => (
+          <Chip key={index} label={tech} size="small" variant="outlined" />
+        ))}
+      </Box>
+    ),
+  },
+];
+
+// Column definitions for Jobs DataGrid
+const jobColumns: GridColDef[] = [
+  {
+    field: "title",
+    headerName: "Job Title",
+    width: 200,
+    renderCell: (params) => (
+      <Box sx={{ display: "flex", alignItems: "center" }}>
+        <Work sx={{ mr: 1, color: "primary.main" }} />
+        {params.value}
+      </Box>
+    ),
+  },
+  {
+    field: "company",
+    headerName: "Company",
+    width: 150,
+  },
+  {
+    field: "location",
+    headerName: "Location",
+    width: 150,
+  },
+  {
+    field: "requiredSkills",
+    headerName: "Required Skills",
+    flex: 1,
+
+    renderCell: (params) => (
+      <Box
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 0.5,
+          alignItems: "center",
+          height: "100%",
+          py: 0.5,
+        }}
+      >
+        {params.value?.map((skill: string, index: number) => (
+          <Chip key={index} label={skill} size="small" variant="outlined" />
+        ))}
+      </Box>
+    ),
+  },
+];
 
 export const AnalyticsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -78,305 +168,112 @@ export const AnalyticsPage: React.FC = () => {
   if (error) {
     return (
       <Container sx={{ py: 4 }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-        <Button onClick={handleBackClick} startIcon={<ArrowBack />}>
-          Back to Dashboard
-        </Button>
+        <Alert severity="error">{error}</Alert>
       </Container>
     );
   }
 
   return (
     <Container sx={{ py: 4 }}>
-      {/* Header with back button */}
-      <Box sx={{ mb: 6 }}>
-        <Button
-          onClick={handleBackClick}
-          startIcon={<ArrowBack />}
-          sx={{ mb: 2 }}
-        >
-          Back to Dashboard
-        </Button>
-        <Typography
-          variant="h3"
-          component="h1"
-          sx={{
-            fontWeight: 500,
-            color: "#EA8600",
-            fontSize: { xs: "2rem", md: "2.5rem" },
-          }}
-        >
-          Analytics Dashboard
-        </Typography>
-        <Typography
-          variant="h6"
-          color="text.secondary"
-          sx={{ fontWeight: 300, mt: 1 }}
-        >
-          Overview all the CVs and Job Descriptions
-        </Typography>
+      {/* Header */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 3,
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center" }}>
+          <Button
+            onClick={handleBackClick}
+            startIcon={<ArrowBack />}
+            sx={{ mr: 2 }}
+          >
+            Back to Dashboard
+          </Button>
+          <Typography variant="h4" component="h1" fontWeight="bold">
+            Analytics
+          </Typography>
+        </Box>
       </Box>
 
-      {/* Main Analytics Card */}
-      <Box mb={2}>
-        <Tabs
-          value={tabValue}
-          onChange={handleTabChange}
-          aria-label="analytics tabs"
-          sx={{ px: 3, pt: 2 }}
-        >
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+        <Tabs value={tabValue} onChange={handleTabChange}>
           <Tab
             icon={<Description />}
             label={`CVs (${cvs.length})`}
             iconPosition="start"
-            sx={{ textTransform: "none", fontWeight: 500 }}
           />
           <Tab
             icon={<Work />}
             label={`Jobs (${jobs.length})`}
             iconPosition="start"
-            sx={{ textTransform: "none", fontWeight: 500 }}
           />
         </Tabs>
       </Box>
-      <Card sx={{ mb: 4 }}>
-        <CardContent sx={{ p: 0 }}>
-          {/* CVs Tab Panel */}
+
+      {/* CV DataGrid */}
+      <Card>
+        <CardContent>
           <TabPanel value={tabValue} index={0}>
-            {cvs.length === 0 ? (
-              <Box sx={{ textAlign: "center", py: 8 }}>
-                <Description
-                  sx={{ fontSize: 64, color: "text.secondary", mb: 2 }}
-                />
-                <Typography variant="h6" gutterBottom>
-                  No CVs analyzed yet
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Upload and analyze CVs to see them here
-                </Typography>
-              </Box>
-            ) : (
-              <Grid container spacing={3}>
-                {cvs.map((cv) => (
-                  <Grid size={{ xs: 12, md: 6, lg: 4 }} key={cv.id}>
-                    <Card
-                      sx={{
-                        height: "100%",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                        "&:hover": {
-                          boxShadow: 2,
-                          transform: "translateY(-2px)",
-                        },
-                      }}
-                    >
-                      <CardContent>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1,
-                            mb: 2,
-                          }}
-                        >
-                          <Person color="primary" />
-                          <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                            {cv.name || "Unknown"}
-                          </Typography>
-                        </Box>
-
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{
-                            mb: 2,
-                            display: "-webkit-box",
-                            WebkitLineClamp: 3,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {cv.summary || "No summary available"}
-                        </Typography>
-
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            Experience: {cv.experienceYears} years
-                          </Typography>
-                        </Box>
-
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: 0.5,
-                            mb: 2,
-                          }}
-                        >
-                          {cv.technologies.slice(0, 3).map((tech, index) => (
-                            <Chip
-                              key={index}
-                              label={tech}
-                              size="small"
-                              variant="outlined"
-                              color="primary"
-                            />
-                          ))}
-                          {cv.technologies.length > 3 && (
-                            <Chip
-                              label={`+${cv.technologies.length - 3} more`}
-                              size="small"
-                              variant="outlined"
-                            />
-                          )}
-                        </Box>
-
-                        {cv.warnings && cv.warnings.length > 0 && (
-                          <Box sx={{ mt: 1 }}>
-                            <Chip
-                              label={`${cv.warnings.length} warnings`}
-                              color="warning"
-                              size="small"
-                            />
-                          </Box>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            )}
+            <Box sx={{ width: "100%" }}>
+              <DataGrid
+              rowHeight={60}
+                rows={cvs}
+                columns={cvColumns}
+                initialState={{
+                  pagination: {
+                    paginationModel: {
+                      pageSize: 10,
+                    },
+                  },
+                }}
+                pageSizeOptions={[5, 10, 25]}
+                checkboxSelection
+                disableRowSelectionOnClick
+                sx={{
+                  "& .MuiDataGrid-cell": {
+                    borderBottom: "1px solid rgba(224, 224, 224, 1)",
+                  },
+                  "& .MuiDataGrid-columnHeaders": {
+                    backgroundColor: "rgba(0, 0, 0, 0.04)",
+                    fontWeight: "bold",
+                  },
+                }}
+              />
+            </Box>
           </TabPanel>
 
-          {/* Jobs Tab Panel */}
+          {/* Jobs DataGrid */}
           <TabPanel value={tabValue} index={1}>
-            {jobs.length === 0 ? (
-              <Box sx={{ textAlign: "center", py: 8 }}>
-                <Business
-                  sx={{ fontSize: 64, color: "text.secondary", mb: 2 }}
-                />
-                <Typography variant="h6" gutterBottom>
-                  No Job Descriptions analyzed yet
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Upload and analyze job descriptions to see them here
-                </Typography>
-              </Box>
-            ) : (
-              <Grid container spacing={3}>
-                {jobs.map((job) => (
-                  <Grid size={{ xs: 12, md: 6, lg: 4 }} key={job.id}>
-                    <Card
-                      sx={{
-                        height: "100%",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                        "&:hover": {
-                          boxShadow: 2,
-                          transform: "translateY(-2px)",
-                        },
-                      }}
-                    >
-                      <CardContent>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1,
-                            mb: 2,
-                          }}
-                        >
-                          <Business color="primary" />
-                          <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                            {job.title}
-                          </Typography>
-                        </Box>
-
-                        {job.company && (
-                          <Typography
-                            variant="subtitle2"
-                            color="text.secondary"
-                            sx={{ mb: 1 }}
-                          >
-                            {job.company}
-                          </Typography>
-                        )}
-
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{
-                            mb: 2,
-                            display: "-webkit-box",
-                            WebkitLineClamp: 3,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {job.description}
-                        </Typography>
-
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            Experience Required: {job.experienceRequired} years
-                          </Typography>
-                        </Box>
-
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: 0.5,
-                            mb: 2,
-                          }}
-                        >
-                          {job.requiredSkills
-                            .slice(0, 3)
-                            .map((skill, index) => (
-                              <Chip
-                                key={index}
-                                label={skill}
-                                size="small"
-                                variant="outlined"
-                                color="secondary"
-                              />
-                            ))}
-                          {job.requiredSkills.length > 3 && (
-                            <Chip
-                              label={`+${job.requiredSkills.length - 3} more`}
-                              size="small"
-                              variant="outlined"
-                            />
-                          )}
-                        </Box>
-
-                        {job.location && (
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: "block", mb: 1 }}
-                          >
-                            📍 {job.location}
-                          </Typography>
-                        )}
-
-                        {job.warnings && job.warnings.length > 0 && (
-                          <Box sx={{ mt: 1 }}>
-                            <Chip
-                              label={`${job.warnings.length} warnings`}
-                              color="warning"
-                              size="small"
-                            />
-                          </Box>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            )}
+            <Box sx={{ width: "100%" }}>
+              <DataGrid
+                rows={jobs}
+                columns={jobColumns}
+                initialState={{
+                  pagination: {
+                    paginationModel: {
+                      pageSize: 10,
+                    },
+                  },
+                }}
+                rowHeight={60}
+                pageSizeOptions={[5, 10, 25]}
+                checkboxSelection
+                disableRowSelectionOnClick
+                sx={{
+                  "& .MuiDataGrid-cell": {
+                    borderBottom: "1px solid rgba(224, 224, 224, 1)",
+                  },
+                  "& .MuiDataGrid-columnHeaders": {
+                    backgroundColor: "rgba(0, 0, 0, 0.04)",
+                    fontWeight: "bold",
+                  },
+                }}
+              />
+            </Box>
           </TabPanel>
         </CardContent>
       </Card>
