@@ -706,13 +706,15 @@ export async function analyzeJobWithOpenAI(text: string): Promise<JobAnalysis> {
  * @param storagePath - Path to the file in Firebase Storage
  * @param fileType - Type of file (cv or jobDescription)
  * @param fileName - Name of the file for context
+ * @param jobsContext - Optional context about available jobs for matching/comparison
  * @returns Promise<string> - AI response
  */
 export async function chatWithFileContent(
   question: string,
   storagePath: string,
   fileType: string,
-  fileName: string
+  fileName: string,
+  jobsContext?: string
 ): Promise<string> {
   try {
     logger.info("Starting chat with file content", {
@@ -738,7 +740,7 @@ export async function chatWithFileContent(
     });
 
     // Prepare system prompt based on file type
-    const systemPrompt = `You are an AI assistant specialized in analyzing ${fileType === 'cv' ? 'CVs/resumes' : 'job descriptions'}. 
+    let systemPrompt = `You are an AI assistant specialized in analyzing ${fileType === 'cv' ? 'CVs/resumes' : 'job descriptions'}. 
 
 You have access to the content of a ${fileType === 'cv' ? 'CV/resume' : 'job description'} file named "${fileName}".
 
@@ -747,9 +749,13 @@ Your role is to:
 - Provide insights and analysis when asked
 - Give constructive feedback and suggestions
 - Be helpful and professional in your responses
-- Keep responses brief but informative (aim for 2-3 sentences unless more detail is specifically requested)
+- Keep responses brief but informative (aim for 2-3 sentences unless more detail is specifically requested)`;
 
-Always base your answers on the actual content of the document. If you can't find specific information in the document, say so clearly.`;
+    if (jobsContext) {
+      systemPrompt += `\n\nYou also have access to job opportunities data for comparison and matching analysis. Use this context when answering questions about job fit, skill gaps, or career recommendations.`;
+    }
+
+    systemPrompt += `\n\nAlways base your answers on the actual content of the document. If you can't find specific information in the document, say so clearly.`;
 
     // If the text is too long, create chunks and process them
     const chunks = createTextChunks(extractedText, 150000); // Smaller chunks for chat
@@ -789,6 +795,15 @@ Always base your answers on the actual content of the document. If you can't fin
       context = summaries.join("\n\n");
     }
 
+    // Prepare user message content
+    let userContent = `Here is the ${fileType === 'cv' ? 'CV/resume' : 'job description'} content:\n\n${context}`;
+    
+    if (jobsContext) {
+      userContent += `\n\n${jobsContext}`;
+    }
+    
+    userContent += `\n\nQuestion: ${question}`;
+
     // Generate response using OpenAI
     const response = await getOpenAIClient().chat.completions.create({
       model: resolveModel(),
@@ -796,10 +811,10 @@ Always base your answers on the actual content of the document. If you can't fin
         { role: "system", content: systemPrompt },
         { 
           role: "user", 
-          content: `Here is the ${fileType === 'cv' ? 'CV/resume' : 'job description'} content:\n\n${context}\n\nQuestion: ${question}` 
+          content: userContent
         }
       ],
-      max_tokens: 800,
+      max_tokens: 1000, // Increased for more comprehensive responses with job context
       temperature: 0.3,
     });
 

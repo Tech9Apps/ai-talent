@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Box,
   Card,
@@ -17,6 +17,7 @@ import {
 } from "@mui/icons-material";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../../firebase";
+import { useSearchParams } from "react-router-dom";
 
 interface Message {
   id: string;
@@ -35,6 +36,7 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
   fileId,
   fileName,
 }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -45,6 +47,7 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
   ]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [hasProcessedQuery, setHasProcessedQuery] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatFileAnalysis = httpsCallable(functions, "chatFileAnalysis");
 
@@ -52,16 +55,12 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const handleSendMessage = async () => {
-    if (!inputText.trim() || isLoading) return;
+  const sendMessage = useCallback(async (messageText: string) => {
+    if (!messageText.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputText,
+      text: messageText,
       sender: "user",
       timestamp: new Date(),
     };
@@ -75,12 +74,11 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
     };
 
     setMessages((prev) => [...prev, userMessage, loadingMessage]);
-    setInputText("");
     setIsLoading(true);
 
     try {
       const result = await chatFileAnalysis({
-        question: inputText,
+        question: messageText,
         fileId: fileId,
       });
 
@@ -113,6 +111,30 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
     } finally {
       setIsLoading(false);
     }
+  }, [isLoading, chatFileAnalysis, fileId]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Process query parameter on component mount
+  useEffect(() => {
+    const queryQuestion = searchParams.get('q');
+    if (queryQuestion && !hasProcessedQuery && !isLoading) {
+      setHasProcessedQuery(true);
+      // Clear the query parameter from URL
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('q');
+      setSearchParams(newSearchParams, { replace: true });
+      // Process the question
+      sendMessage(queryQuestion);
+    }
+  }, [searchParams, hasProcessedQuery, isLoading, setSearchParams, sendMessage]);
+
+  const handleSendMessage = () => {
+    if (!inputText.trim()) return;
+    sendMessage(inputText);
+    setInputText("");
   };
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
@@ -138,13 +160,6 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
       <CardContent sx={{ flexGrow: 1, display: "flex", flexDirection: "column", p: 0 }}>
         {/* Header */}
         <Box sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <SmartToy sx={{ color: "primary.main" }} />
-            <Typography variant="h6" sx={{ fontWeight: 500 }}>
-              AI Assistant
-            </Typography>
-            <Chip label="Powered by OpenAI" size="small" variant="outlined" />
-          </Box>
           <Typography variant="body2" color="text.secondary">
             Ask questions about your CV analysis
           </Typography>

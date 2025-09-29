@@ -112,12 +112,56 @@ async function handleChatFileAnalysis(
       storagePath,
     });
 
+    // Get available jobs for context (only if user is asking about CV analysis or matching)
+    let jobsContext: string | undefined;
+    
+    // Check if question is about job matching, improvement, or comparison
+    const isJobRelatedQuestion = /job|position|match|improve|compare|role|skill|requirement|experience|qualification/i.test(question);
+    
+    if (isJobRelatedQuestion) {
+      try {
+        const jobsSnapshot = await admin
+          .firestore()
+          .collection("jobs")
+          .where("userId", "==", userId)
+          .limit(10) // Limit to recent jobs to avoid token limits
+          .get();
+
+        if (!jobsSnapshot.empty) {
+          const jobsSummary = jobsSnapshot.docs.map(doc => {
+            const jobData = doc.data();
+            return {
+              title: jobData.title || "Unknown Position",
+              company: jobData.company || "Unknown Company", 
+              requiredSkills: jobData.requiredSkills || [],
+              experienceRequired: jobData.experienceRequired || 0,
+              description: jobData.description ? jobData.description.substring(0, 200) + "..." : ""
+            };
+          });
+
+          jobsContext = `Available job opportunities for comparison:\n${JSON.stringify(jobsSummary, null, 2)}`;
+          
+          logger.info("Added jobs context", {
+            userId,
+            jobsCount: jobsSummary.length,
+          });
+        }
+      } catch (jobsError) {
+        logger.warn("Failed to retrieve jobs context", {
+          error: jobsError,
+          userId,
+        });
+        // Continue without jobs context
+      }
+    }
+
     // Use OpenAI service to chat with the file content
     const aiResponse = await chatWithFileContent(
       question,
       storagePath,
       fileData.fileType,
-      fileData.fileName
+      fileData.fileName,
+      jobsContext
     );
 
     logger.info("AI chat response generated", {

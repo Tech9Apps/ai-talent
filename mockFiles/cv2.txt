@@ -1,0 +1,67 @@
+Jason Hume González
+
+Software Architect | Backend Engineer | .NET · Cloud · Microservices
+
+📍 Remoto / Internacional
+📧 [tu correo]
+🔗 [LinkedIn / GitHub]
+
+Professional Summary
+
+Ingeniero de Software con 8+ años de experiencia en desarrollo y arquitectura de sistemas. Especializado en .NET Core, C#, microservicios y plataformas cloud (Azure/AWS). He liderado proyectos desde la definición de la arquitectura hasta la implementación, asegurando escalabilidad, seguridad y alto rendimiento.
+
+Trayectoria en fintech, SaaS y aplicaciones de alto volumen de transacciones, con un enfoque en calidad, buenas prácticas y mentoring de equipos de desarrollo.
+
+Work Experience
+Prestige Financial Services (Tech9) – Software Architect / Senior Engineer
+
+📅 2020 – Actualidad
+
+Diseño de la arquitectura de aplicaciones empresariales usando .NET Core, Blazor y Azure.
+
+Implementación de microservicios y APIs seguras de alto rendimiento.
+
+Definición de estándares de CI/CD pipelines en Azure DevOps.
+
+Mentoría a desarrolladores en mejores prácticas de arquitectura y clean code.
+
+Participación en la modernización de sistemas legacy hacia entornos cloud.
+
+Freelance / Side Projects – Backend & Solution Architect
+
+📅 2016 – Actualidad
+
+Creación de plataformas fintech con .NET, Firebase y React.
+
+Diseño de modelos de dominio, DDD, APIs REST/GraphQL y bases de datos escalables.
+
+Construcción de aplicaciones para contratación de servicios, fintech dashboards y pagos digitales.
+
+Integración con servicios de terceros y optimización de pipelines.
+
+Colaboración con startups en la definición de MVPs escalables.
+
+Startup Projects (Champions, Trim Success, Nubi-Go, etc.) – Lead Backend Developer
+
+📅 2017 – 2020
+
+Desarrollo de sistemas de pago, portafolio de inversión y plataformas de trading.
+
+Diseño de backends event-driven con colas y mensajería.
+
+Implementación de seguridad y autenticación (OAuth2, JWT, Clerk).
+
+Liderazgo técnico en la definición de arquitectura y despliegues en la nube.
+
+Skills
+
+Backend & Cloud: C#, .NET Core, ASP.NET, Web API, Azure, AWS, Firebase Functions.
+Architecture: Microservices, Event-Driven, REST/GraphQL APIs, DDD, CQRS.
+Databases: SQL Server, PostgreSQL, MongoDB, Redis.
+Frontend (plus): React, Next.js, Blazor.
+DevOps / Tools: Azure DevOps, GitHub Actions, Docker, Kubernetes, Terraform.
+Practices: Clean Architecture, SOLID, CI/CD, Unit Testing, Secure Coding.
+
+Education
+
+🎓 Ingeniería en Software (o equivalente) – [Universidad / Institución]

@@ -53,9 +53,9 @@ async function storeAIAnalysis(
       });
     }
 
-    // Store in specialized collection (cvs or jobs)
+    // Store in specialized collection (cvs or jobs) using fileId as document ID
     const collectionName = uploadType === "cv" ? "cvs" : "jobs";
-    const specializedRef = admin.firestore().collection(collectionName).doc();
+    const specializedRef = admin.firestore().collection(collectionName).doc(fileId);
 
     batch.set(specializedRef, {
       userId,
