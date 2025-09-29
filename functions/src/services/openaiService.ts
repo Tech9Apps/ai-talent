@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import * as logger from "firebase-functions/logger";
-import { CVAnalysis, JobAnalysis } from "../../../shared/types/aiTypes";
+import { CVAnalysis, JobAnalysis, JobMatch } from "../../../shared/types/aiTypes";
 import { extractTextFromBuffer, extractTextFromStorageFile } from "../utils/storage";
 
 
@@ -841,5 +841,140 @@ Your role is to:
     });
 
     return "I'm sorry, but I encountered an error while processing your question. Please try again or rephrase your question.";
+  }
+}
+
+/**
+ * Analyze match compatibility between CV and Job descriptions
+ */
+export async function analyzeJobMatches(
+  cvAnalysis: CVAnalysis,
+  jobAnalyses: JobAnalysis[]
+): Promise<JobMatch[]> {
+  try {
+    const client = getOpenAIClient();
+
+    // Create a concise summary of CV for matching
+    const cvSummary = `
+CV Summary:
+- Name: ${cvAnalysis.name}
+- Experience: ${cvAnalysis.experienceYears} years
+- Technologies: ${cvAnalysis.technologies.join(', ')}
+- Education: ${cvAnalysis.education?.join(', ') || 'Not specified'}
+- Job History: ${cvAnalysis.jobHistory.join(', ')}
+`;
+
+    // Create concise job descriptions
+    const jobDescriptions = jobAnalyses.map((job, index) => `
+Job ${index + 1}:
+- ID: job_${index + 1}
+- Title: ${job.title}
+- Company: ${job.company || 'Unknown Company'}
+- Required Experience: ${job.experienceRequired} years
+- Required Skills: ${job.requiredSkills.join(', ')}
+- Requirements: ${job.requirements.join(', ')}
+- Location: ${job.location || 'Not specified'}
+`).join('\n');
+
+    const prompt = `
+You are an expert recruiter analyzing CV-job compatibility. Compare this CV against multiple job descriptions and determine match scores.
+
+${cvSummary}
+
+Available Jobs:
+${jobDescriptions}
+
+For each job, analyze:
+1. Skill alignment (technical and soft skills)
+2. Experience level match
+3. Career progression fit
+4. Role responsibilities compatibility
+
+Return a JSON array of matches with scores >= 50%. Each match should have:
+{
+  "jobId": "job_id",
+  "jobTitle": "title",
+  "company": "company_name", 
+  "matchScore": number (0-100),
+  "matchedSkills": ["skill1", "skill2"],
+  "missingSkills": ["skill3", "skill4"],
+  "experienceMatch": boolean,
+  "location": "location"
+}
+
+Only include matches with matchScore >= 50. Be realistic in scoring.
+`;
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert recruiter with deep knowledge of talent matching. Provide accurate, realistic match assessments. Return valid JSON only."
+        },
+        {
+          role: "user", 
+          content: prompt
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 2000,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("No response from OpenAI");
+    }
+
+    // Parse the JSON response
+    let matches: any[];
+    try {
+      matches = JSON.parse(content);
+    } catch (parseError) {
+      logger.error("Failed to parse OpenAI response", {
+        structuredData: true,
+        content,
+        parseError: parseError instanceof Error ? parseError.message : String(parseError),
+      });
+      // Return empty matches if parsing fails
+      return [];
+    }
+
+    // Validate and sanitize matches
+    const validMatches = matches
+      .filter(match => 
+        match.matchScore >= 50 && 
+        match.jobId && 
+        match.jobTitle &&
+        match.matchScore <= 100
+      )
+      .map(match => ({
+        jobId: match.jobId,
+        jobTitle: match.jobTitle,
+        company: match.company || "Unknown Company",
+        matchScore: Math.round(match.matchScore),
+        matchedSkills: Array.isArray(match.matchedSkills) ? match.matchedSkills : [],
+        missingSkills: Array.isArray(match.missingSkills) ? match.missingSkills : [],
+        experienceMatch: Boolean(match.experienceMatch),
+        location: match.location || "Not specified"
+      }));
+
+    logger.info("Job match analysis completed", {
+      structuredData: true,
+      totalJobs: jobAnalyses.length,
+      matchesFound: validMatches.length,
+      averageScore: validMatches.length > 0 
+        ? Math.round(validMatches.reduce((sum, m) => sum + m.matchScore, 0) / validMatches.length)
+        : 0
+    });
+
+    return validMatches;
+
+  } catch (error) {
+    logger.error("Job match analysis failed", {
+      structuredData: true,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new Error(`Failed to analyze job matches: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

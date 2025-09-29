@@ -17,34 +17,8 @@ import { CVAnalysisPage } from "./pages/CVAnalysisPage";
 // Hooks
 import { useAuthContext } from "./contexts/hooks/useAuthContext";
 
-// Types
-import type { NotificationItem } from "./types";
-
 function AppContent() {
   const { user, loading } = useAuthContext();
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
-    {
-      id: "1",
-      message: "Welcome to AI-Talent!",
-      timestamp: new Date(),
-      read: false,
-      type: "info",
-    },
-    {
-      id: "2",
-      message: "CV processing completed",
-      timestamp: new Date(Date.now() - 300000), // 5 minutes ago
-      read: false,
-      type: "success",
-    },
-    {
-      id: "3",
-      message: "New job matches found",
-      timestamp: new Date(Date.now() - 900000), // 15 minutes ago
-      read: true,
-      type: "info",
-    },
-  ]);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -72,17 +46,6 @@ function AppContent() {
 
   const handleAuthSuccess = () => {
     showSnackbar("Successfully signed in!", "success");
-    // Add welcome notification
-    setNotifications((prev) => [
-      {
-        id: Date.now().toString(),
-        message: "Welcome back! You can now upload CVs and job descriptions.",
-        timestamp: new Date(),
-        read: false,
-        type: "success",
-      },
-      ...prev,
-    ]);
   };
 
   const handleAuthError = (error: string) => {
@@ -120,7 +83,7 @@ function AppContent() {
       >
         <Header />
 
-        <SideNav notifications={notifications} />
+        <SideNav />
 
         <Box sx={{ flexGrow: 1 }}>
           <Routes>

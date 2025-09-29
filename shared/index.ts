@@ -22,6 +22,12 @@ export type {
   DeleteCVResponse,
 } from './types/fileTypes';
 export * from './types/aiTypes';
+export type {
+  MatchNotification,
+  CreateNotificationRequest,
+  NotificationResponse,
+  NotificationWithId,
+} from './types/notificationTypes';
 
 // Export utilities
 export * from './utils/validation';

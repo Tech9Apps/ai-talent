@@ -9,6 +9,8 @@ import {
   ListItemText,
   Typography,
   Badge,
+  Divider,
+  CircularProgress,
 } from '@mui/material';
 import {
   DarkMode,
@@ -16,22 +18,19 @@ import {
   Logout,
   AccountCircle,
   Notifications,
+  Work,
+  Person,
 } from '@mui/icons-material';
-import type { NotificationItem } from '../../types';
 import { useThemeContext } from '../../contexts/hooks/useThemeContext';
 import { useAuthContext } from '../../contexts/hooks/useAuthContext';
+import { useNotifications } from '../../hooks/useNotifications';
 
-interface SideNavProps {
-  notifications?: NotificationItem[];
-}
-
-export const SideNav: React.FC<SideNavProps> = ({ notifications = [] }) => {
+export const SideNav: React.FC = () => {
   const { mode, toggleTheme } = useThemeContext();
   const { user, logout } = useAuthContext();
+  const { recentNotifications, unreadCount, loading: notificationsLoading } = useNotifications();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [notificationAnchor, setNotificationAnchor] = useState<null | HTMLElement>(null);
-
-  const unreadNotifications = notifications.filter((n) => n && !n.read).length;
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -128,7 +127,7 @@ export const SideNav: React.FC<SideNavProps> = ({ notifications = [] }) => {
                   }
                 }}
               >
-                <Badge badgeContent={unreadNotifications} color="error">
+                <Badge badgeContent={unreadCount} color="error">
                   <Notifications />
                 </Badge>
               </IconButton>
@@ -141,20 +140,53 @@ export const SideNav: React.FC<SideNavProps> = ({ notifications = [] }) => {
               transformOrigin={{ horizontal: 'right', vertical: 'top' }}
               anchorOrigin={{ horizontal: 'left', vertical: 'top' }}
               PaperProps={{
-                sx: { maxWidth: 300, minWidth: 280 },
+                sx: { maxWidth: 350, minWidth: 320 },
               }}
             >
-              {notifications.length > 0 ? (
-                notifications.slice(0, 5).map((notification) => (
-                  <MenuItem
-                    key={notification.id}
-                    onClick={handleNotificationClose}
-                  >
+              {notificationsLoading ? (
+                <MenuItem>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CircularProgress size={16} />
                     <Typography variant="body2" color="text.secondary">
-                      {notification.message}
+                      Loading notifications...
+                    </Typography>
+                  </Box>
+                </MenuItem>
+              ) : recentNotifications.length > 0 ? (
+                <>
+                  <MenuItem disabled>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                      Recent Notifications
                     </Typography>
                   </MenuItem>
-                ))
+                  <Divider />
+                  {recentNotifications.map((notification) => (
+                    <MenuItem
+                      key={notification.id}
+                      onClick={handleNotificationClose}
+                      sx={{ 
+                        whiteSpace: 'normal',
+                        maxWidth: 320,
+                        opacity: notification.read ? 0.7 : 1
+                      }}
+                    >
+                      <ListItemIcon>
+                        {notification.type === 'cv_match' ? <Person /> : <Work />}
+                      </ListItemIcon>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {notification.title}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {notification.message}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                          {notification.createdAt.toLocaleDateString()} at {notification.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </>
               ) : (
                 <MenuItem onClick={handleNotificationClose}>
                   <Typography variant="body2" color="text.secondary">
