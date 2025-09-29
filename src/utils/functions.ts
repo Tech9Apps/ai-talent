@@ -13,7 +13,9 @@ import type {
   FileUploadRequestData,
   FileUploadResponse,
   GetFilesRequestData,
-  GetFilesResponse
+  GetFilesResponse,
+  DeleteCVRequestData,
+  DeleteCVResponse
 } from "../../shared";
 
 /**
@@ -326,6 +328,62 @@ export async function findJobMatches(
     throw new FunctionsError(
       getFriendlyErrorMessage(error),
       'JOB_MATCHING_ERROR',
+      error
+    );
+  }
+}
+
+/**
+ * Delete existing CV and all associated data
+ * @param fileId - ID of the CV file to delete
+ * @returns Promise with deletion result
+ */
+export async function deleteCV(fileId: string): Promise<DeleteCVResponse> {
+  try {
+    // Prepare request data
+    const requestData: DeleteCVRequestData = {
+      fileId,
+    };
+
+    // Call Firebase Function
+    const deleteCVFunction = httpsCallable<DeleteCVRequestData, DeleteCVResponse>(
+      functions, 
+      "deleteCV"
+    );
+
+    const result = await deleteCVFunction(requestData);
+    
+    if (!result.data.success) {
+      throw new FunctionsError(
+        result.data.message || 'CV deletion failed',
+        'DELETE_FAILED',
+        result.data
+      );
+    }
+
+    return result.data;
+
+  } catch (error: unknown) {
+    console.error('CV deletion error:', error);
+
+    // If it's already our custom error, re-throw it
+    if (error instanceof FunctionsError) {
+      throw error;
+    }
+
+    // Handle Firebase Functions errors
+    if (typeof error === 'object' && error !== null && 'code' in error && 'message' in error) {
+      const firebaseError = error as { code: string; message: string; details?: unknown };
+      throw new FunctionsError(
+        firebaseError.message || 'CV deletion failed',
+        firebaseError.code || 'DELETE_ERROR',
+        firebaseError.details
+      );
+    }
+
+    throw new FunctionsError(
+      getFriendlyErrorMessage(error),
+      'DELETE_ERROR',
       error
     );
   }

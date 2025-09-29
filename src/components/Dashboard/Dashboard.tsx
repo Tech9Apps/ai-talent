@@ -6,20 +6,16 @@ import {
   Card,
   CardContent,
   Box,
-  Chip,
-  TextField,
-  InputAdornment,
+  Fade,
 } from "@mui/material";
-import {
-  CloudUpload,
-  Person,
-  Business,
-  TrendingUp,
-  Search,
-} from "@mui/icons-material";
+import { CloudUpload, Person, Business, TrendingUp } from "@mui/icons-material";
 import { GoogleAuthButton } from "../Auth/GoogleAuthButton";
 import { FileUploadCard } from "../FileUpload/FileUploadCard";
+import { CVAnalysisCard } from "../CVAnalysis/CVAnalysisCard";
+import { FileStatsChart } from "../Charts/FileStatsChart";
+import { useUserFiles } from "../../contexts/hooks/useUserFiles";
 import type { User } from "../../types";
+import type { UserFileRecord } from "../../../shared/types/fileTypes";
 
 interface WelcomeSectionProps {
   user: User | null;
@@ -73,16 +69,22 @@ interface GetStartedSectionProps {
   user: User | null;
   onAuthSuccess?: () => void;
   onAuthError?: (error: string) => void;
+  cvFile?: UserFileRecord | null;
+  jobDescriptionsCount?: number;
+  filesLoading?: boolean;
 }
 
 const GetStartedSection: React.FC<GetStartedSectionProps> = ({
   user,
   onAuthSuccess,
   onAuthError,
+  cvFile,
+  jobDescriptionsCount,
+  filesLoading,
 }) => {
   if (!user) {
     return (
-      <Box sx={{ mb: 6 }}>
+      <Box>
         <Typography variant="h5" gutterBottom sx={{ fontWeight: 500, mb: 3 }}>
           Get Started
         </Typography>
@@ -107,7 +109,7 @@ const GetStartedSection: React.FC<GetStartedSectionProps> = ({
 
   return (
     <Box>
-      <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 2 }}>
+      <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 1 }}>
         Get Started
       </Typography>
       <Grid container spacing={1}>
@@ -117,6 +119,8 @@ const GetStartedSection: React.FC<GetStartedSectionProps> = ({
             title="Upload Resume"
             description="Upload your resume to get AI-powered job matching and optimization suggestions"
             icon={<Person sx={{ fontSize: 40, color: "#1976d2" }} />}
+            cvFile={cvFile}
+            filesLoading={filesLoading}
           />
         </Grid>
         <Grid size={12}>
@@ -125,8 +129,28 @@ const GetStartedSection: React.FC<GetStartedSectionProps> = ({
             title="Upload Job Description"
             description="Upload job descriptions to find the best matching candidates from your talent pool"
             icon={<Business sx={{ fontSize: 40, color: "#1976d2" }} />}
+            jobDescriptionsCount={jobDescriptionsCount}
+            filesLoading={filesLoading}
           />
         </Grid>
+
+        {/* CV Analysis Card - Only show if user has a CV */}
+        <Fade in={Boolean(cvFile && !filesLoading)} timeout={250}>
+          <Box>
+            <Typography
+              variant="subtitle1"
+              color="text.secondary"
+              sx={{ mb: 1, mt: 4 }}
+            >
+              CV Analysis
+            </Typography>
+            <Grid size={12}>
+              {cvFile && (
+                <CVAnalysisCard cvFile={cvFile} filesLoading={filesLoading} />
+              )}
+            </Grid>
+          </Box>
+        </Fade>
       </Grid>
     </Box>
   );
@@ -143,16 +167,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onAuthSuccess,
   onAuthError,
 }) => {
+  // Get user files data
+  const { cvFile, jobDescriptionFiles, loading: filesLoading } = useUserFiles();
+  const jobDescriptionsCount = jobDescriptionFiles?.length || 0;
+
   return (
     <Container sx={{ py: 4 }}>
+      <WelcomeSection user={user} />
       <Grid container spacing={8}>
         {/* Main content area */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <WelcomeSection user={user} />
           <GetStartedSection
             user={user}
             onAuthSuccess={onAuthSuccess}
             onAuthError={onAuthError}
+            cvFile={cvFile}
+            jobDescriptionsCount={jobDescriptionsCount}
+            filesLoading={filesLoading}
           />
 
           {/* Sample projects section (similar to Firebase console) */}
@@ -212,261 +243,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Right sidebar - Projects list like Firebase */}
         <Grid size={{ xs: 12, md: 6 }}>
           <Box sx={{ position: "sticky", top: 24 }}>
-            {/* Search bar */}
-            <TextField
-              fullWidth
-              placeholder="Search in all projects and workspaces"
-              size="small"
-              sx={{ mb: 2 }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search />
-                  </InputAdornment>
-                ),
-              }}
-            />
-
-            {/* Projects dropdown and list */}
-            <Box sx={{ mb: 2 }}>
-              <TextField
-                select
-                fullWidth
-                defaultValue="projects"
-                size="small"
-                SelectProps={{
-                  native: true,
-                }}
-                sx={{ mb: 2 }}
-              >
-                <option value="projects">Projects and workspaces</option>
-              </TextField>
-            </Box>
-
-            {/* Projects list */}
-            <Card sx={{ p: 0 }}>
-              <Box sx={{ display: "flex", flexDirection: "column" }}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                    p: 2,
-                    "&:hover": { bgcolor: "action.hover" },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      bgcolor: "#4285f4",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "white",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    AI
-                  </Box>
-                  <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="body2" fontWeight="medium">
-                      ai-talent
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      ai-talent-c9021
-                    </Typography>
-                  </Box>
-                  <Chip
-                    icon={
-                      <Box component="span" sx={{ fontSize: "12px" }}>
-                        ★
-                      </Box>
-                    }
-                    label=""
-                    size="small"
-                    variant="outlined"
-                    sx={{
-                      minWidth: "auto",
-                      width: 24,
-                      height: 24,
-                      "& .MuiChip-icon": { margin: 0 },
-                    }}
-                  />
-                </Box>
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                    p: 2,
-                    "&:hover": { bgcolor: "action.hover" },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      bgcolor: "#34a853",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "white",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    HC
-                  </Box>
-                  <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="body2" fontWeight="medium">
-                      humex-champions
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      humex-champions
-                    </Typography>
-                  </Box>
-                  <Chip
-                    icon={
-                      <Box component="span" sx={{ fontSize: "12px" }}>
-                        ★
-                      </Box>
-                    }
-                    label=""
-                    size="small"
-                    variant="outlined"
-                    sx={{
-                      minWidth: "auto",
-                      width: 24,
-                      height: 24,
-                      "& .MuiChip-icon": { margin: 0 },
-                    }}
-                  />
-                </Box>
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                    p: 2,
-                    "&:hover": { bgcolor: "action.hover" },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      bgcolor: "#fbbc04",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "white",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    TS
-                  </Box>
-                  <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="body2" fontWeight="medium">
-                      trim-success
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      trim-success
-                    </Typography>
-                  </Box>
-                  <Chip
-                    icon={
-                      <Box component="span" sx={{ fontSize: "12px" }}>
-                        ★
-                      </Box>
-                    }
-                    label=""
-                    size="small"
-                    variant="outlined"
-                    sx={{
-                      minWidth: "auto",
-                      width: 24,
-                      height: 24,
-                      "& .MuiChip-icon": { margin: 0 },
-                    }}
-                  />
-                </Box>
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                    p: 2,
-                    "&:hover": { bgcolor: "action.hover" },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      bgcolor: "#ea4335",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "white",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    NH
-                  </Box>
-                  <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="body2" fontWeight="medium">
-                      nexus-hr
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      nexus-hr-9631d
-                    </Typography>
-                  </Box>
-                  <Chip
-                    icon={
-                      <Box component="span" sx={{ fontSize: "12px" }}>
-                        ★
-                      </Box>
-                    }
-                    label=""
-                    size="small"
-                    variant="outlined"
-                    sx={{
-                      minWidth: "auto",
-                      width: 24,
-                      height: 24,
-                      "& .MuiChip-icon": { margin: 0 },
-                    }}
-                  />
-                </Box>
-              </Box>
-
-              {/* Pagination */}
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  p: 2,
-                  borderTop: "1px solid",
-                  borderColor: "divider",
-                }}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  1-4 de 4
-                </Typography>
-              </Box>
-            </Card>
+            <Typography
+              variant="subtitle1"
+              color="text.secondary"
+              sx={{ mb: 1 }}
+            >
+              Statistics
+            </Typography>
+            <Grid container spacing={1}>
+              <Grid size={12}>
+                <FileStatsChart />
+              </Grid>
+            </Grid>
           </Box>
         </Grid>
       </Grid>

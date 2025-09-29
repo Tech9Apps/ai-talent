@@ -1,0 +1,64 @@
+Jason Hume González
+
+Frontend Developer | React · Next.js · MUI · Blazor
+
+📍 Remote / International
+📧 [your email]
+🔗 [LinkedIn / GitHub]
+
+Professional Summary
+
+Frontend Developer with 6+ years of experience building modern, scalable, and user-focused interfaces. Expert in React, Next.js, Material-UI, and Blazor, with a proven track record in both enterprise and startup projects. Passionate about creating fast, accessible, and responsive applications with API integrations and performance optimization.
+
+Work Experience
+Prestige Financial Services (Tech9) – Software Engineer
+
+📅 2021 – Present
+
+Developed reusable frontend components with Blazor and React.
+
+Implemented custom MUI themes, responsive layouts, and accessibility standards.
+
+Integrated REST APIs and optimized the performance of financial dashboards.
+
+Contributed to frontend architecture discussions and best practice adoption.
+
+Freelance / Side Projects – Frontend Developer
+
+📅 2018 – Present
+
+Built web applications using React, Next.js, and Firebase.
+
+Created fintech dashboards, inventory apps, and on-demand service platforms.
+
+Implemented authentication with Clerk and Firebase Auth, onboarding flows, and user management.
+
+Applied react-hook-form, yup, and zod for advanced form validations.
+
+Delivered rapid prototyping workflows from Figma to MUI.
+
+Startup Projects (Champions, Trim Success, Nubi-Go, etc.)
+
+📅 2019 – 2023
+
+Designed and developed modern landing pages and integrated payment systems.
+
+Improved SEO and performance in Next.js (SSR/SSG).
+
+Implemented interactive charts with Recharts and Chart.js.
+
+Built modules for trading, portfolio management, and personal finance.
+
+Skills
+
+Frontend: React, Next.js, Angular, Blazor, TypeScript, JavaScript ES6+, Material-UI, TailwindCSS
+State Management: Redux, Zustand, React Query
+UI/UX: Responsive Design, Figma to Code, Accessibility (WCAG)
+Forms & Validation: react-hook-form, yup, zod
+Charts & Visualization: Recharts, Chart.js
+Backend Basics: .NET Core APIs, Firebase Functions
+DevOps / Tools: Git, Azure DevOps, Docker, CI/CD pipelines
+
+Education
+
+🎓 Bachelor’s in Software Engineering (or equivalent) – [University / Institution]

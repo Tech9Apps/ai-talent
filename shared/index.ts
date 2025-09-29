@@ -7,7 +7,20 @@
 export * from './constants/fileConstants';
 
 // Export types
-export * from './types/fileTypes';
+export type {
+  UploadType,
+  FirebaseTimestamp,
+  FileUploadConfig,
+  FileMetadata,
+  UserFileRecord,
+  FileUploadRequestData,
+  FileUploadResponse,
+  FileInfo,
+  GetFilesRequestData,
+  GetFilesResponse,
+  DeleteCVRequestData,
+  DeleteCVResponse,
+} from './types/fileTypes';
 export * from './types/aiTypes';
 
 // Export utilities

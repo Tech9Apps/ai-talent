@@ -9,6 +9,14 @@
 export type UploadType = 'cv' | 'jobDescription';
 
 /**
+ * Firebase Timestamp type (to avoid importing firebase-admin in client)
+ */
+export interface FirebaseTimestamp {
+  toDate(): Date;
+  toMillis(): number;
+}
+
+/**
  * File upload configuration (server-side)
  */
 export interface FileUploadConfig {
@@ -27,11 +35,34 @@ export interface FileMetadata {
   fileName: string;
   originalName: string;
   fileType: string;
-  uploadType: UploadType;
-  uploadedAt: Date | FirebaseTimestamp; // Flexible for both environments
   fileSize: number;
-  downloadURL?: string;
+  uploadType: UploadType;
   storagePath: string;
+  downloadURL: string;
+  uploadedAt: Date;
+}
+
+/**
+ * User file record (stored in Firestore users/{userId}/files collection)
+ * This represents the structure saved in Firestore
+ */
+export interface UserFileRecord {
+  id?: string;
+  userId: string;
+  fileName: string;
+  originalName: string;
+  fileType: string;
+  uploadType: UploadType;
+  storagePath: string;
+  downloadURL: string;
+  uploadedAt: FirebaseTimestamp;
+  size: number;
+  status: string; // "uploaded", "processing", "completed", "error"
+  processed: boolean;
+  aiProcessed?: boolean;
+  aiAnalysis?: Record<string, unknown>;
+  matchesFound?: number;
+  createdAt: FirebaseTimestamp;
 }
 
 /**
@@ -96,9 +127,18 @@ export interface GetFilesResponse {
 }
 
 /**
- * Firebase Timestamp type (to avoid importing firebase-admin in client)
+ * Delete CV request data (client to Functions)
  */
-interface FirebaseTimestamp {
-  toDate(): Date;
-  toMillis(): number;
+export interface DeleteCVRequestData {
+  fileId: string;
 }
+
+/**
+ * Delete CV response (Functions to client)
+ */
+export interface DeleteCVResponse {
+  success: boolean;
+  message: string;
+  deletedFileId?: string;
+}
+

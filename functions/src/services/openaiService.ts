@@ -1,7 +1,6 @@
 import OpenAI from "openai";
 import * as logger from "firebase-functions/logger";
 import { CVAnalysis, JobAnalysis } from "../../../shared/types/aiTypes";
-import * as admin from "firebase-admin";
 import { extractTextFromBuffer, extractTextFromStorageFile } from "../utils/storage";
 
 
@@ -698,5 +697,149 @@ export async function analyzeJobWithOpenAI(text: string): Promise<JobAnalysis> {
         error instanceof Error ? error.message : "Unknown error occurred",
       ],
     };
+  }
+}
+
+/**
+ * Chat with file content using OpenAI
+ * @param question - The user's question about the file
+ * @param storagePath - Path to the file in Firebase Storage
+ * @param fileType - Type of file (cv or jobDescription)
+ * @param fileName - Name of the file for context
+ * @param jobsContext - Optional context about available jobs for matching/comparison
+ * @returns Promise<string> - AI response
+ */
+export async function chatWithFileContent(
+  question: string,
+  storagePath: string,
+  fileType: string,
+  fileName: string,
+  jobsContext?: string
+): Promise<string> {
+  try {
+    logger.info("Starting chat with file content", {
+      structuredData: true,
+      fileName,
+      fileType,
+      questionLength: question.length,
+    });
+
+    // Extract text from the file
+    const extractedText = await extractTextFromStorageFile(
+      storagePath,
+      fileName
+    );
+    
+    if (!extractedText || extractedText.trim().length === 0) {
+      return "I'm sorry, but I couldn't extract text from this file. The file might be corrupted or in an unsupported format.";
+    }
+
+    logger.info("Text extracted from file", {
+      structuredData: true,
+      textLength: extractedText.length,
+    });
+
+    // Prepare system prompt based on file type
+    let systemPrompt = `You are an AI assistant specialized in analyzing ${fileType === 'cv' ? 'CVs/resumes' : 'job descriptions'}. 
+
+You have access to the content of a ${fileType === 'cv' ? 'CV/resume' : 'job description'} file named "${fileName}".
+
+Your role is to:
+- Answer questions about the content accurately and concisely
+- Provide insights and analysis when asked
+- Give constructive feedback and suggestions
+- Be helpful and professional in your responses
+- Keep responses brief but informative (aim for 2-3 sentences unless more detail is specifically requested)`;
+
+    if (jobsContext) {
+      systemPrompt += `\n\nYou also have access to job opportunities data for comparison and matching analysis. Use this context when answering questions about job fit, skill gaps, or career recommendations.`;
+    }
+
+    systemPrompt += `\n\nAlways base your answers on the actual content of the document. If you can't find specific information in the document, say so clearly.`;
+
+    // If the text is too long, create chunks and process them
+    const chunks = createTextChunks(extractedText, 150000); // Smaller chunks for chat
+    let context = "";
+
+    if (chunks.length === 1) {
+      context = extractedText;
+    } else {
+      // For multiple chunks, summarize first to create context
+      logger.info("File too large, creating summary for context", {
+        structuredData: true,
+        totalChunks: chunks.length,
+      });
+      
+      const summaries: string[] = [];
+      
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const summarizePrompt = `Summarize the key information from this ${fileType === 'cv' ? 'CV/resume' : 'job description'} content. Focus on the most important details:\n\n${chunk}`;
+        
+        const summaryResponse = await getOpenAIClient().chat.completions.create({
+          model: resolveModel(),
+          messages: [
+            { role: "system", content: "You are a helpful assistant that creates concise summaries." },
+            { role: "user", content: summarizePrompt }
+          ],
+          max_tokens: 500,
+          temperature: 0.1,
+        });
+
+        const summary = summaryResponse.choices[0]?.message?.content?.trim();
+        if (summary) {
+          summaries.push(`Section ${i + 1}: ${summary}`);
+        }
+      }
+      
+      context = summaries.join("\n\n");
+    }
+
+    // Prepare user message content
+    let userContent = `Here is the ${fileType === 'cv' ? 'CV/resume' : 'job description'} content:\n\n${context}`;
+    
+    if (jobsContext) {
+      userContent += `\n\n${jobsContext}`;
+    }
+    
+    userContent += `\n\nQuestion: ${question}`;
+
+    // Generate response using OpenAI
+    const response = await getOpenAIClient().chat.completions.create({
+      model: resolveModel(),
+      messages: [
+        { role: "system", content: systemPrompt },
+        { 
+          role: "user", 
+          content: userContent
+        }
+      ],
+      max_tokens: 1000, // Increased for more comprehensive responses with job context
+      temperature: 0.3,
+    });
+
+    const aiResponse = response.choices[0]?.message?.content?.trim();
+    
+    if (!aiResponse) {
+      return "I apologize, but I wasn't able to generate a response to your question. Please try rephrasing your question or ask something else.";
+    }
+
+    logger.info("Chat response generated successfully", {
+      structuredData: true,
+      responseLength: aiResponse.length,
+      tokensUsed: response.usage?.total_tokens || 0,
+    });
+
+    return aiResponse;
+
+  } catch (error) {
+    logger.error("Failed to chat with file content", {
+      structuredData: true,
+      error: error instanceof Error ? error.message : String(error),
+      fileName,
+      fileType,
+    });
+
+    return "I'm sorry, but I encountered an error while processing your question. Please try again or rephrase your question.";
   }
 }
