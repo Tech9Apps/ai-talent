@@ -173,7 +173,7 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
       currentStepRef.current = currentStep;
       updateStep(currentStep, "processing", "Finding job matches...");
       if (type === "cv") {
-        const matchResult = await findJobMatches(result.fileId);
+        const matchResult = await findJobMatches(result.fileId, type);
         updateStep(
           currentStep,
           "completed",

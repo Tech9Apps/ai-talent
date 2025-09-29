@@ -978,3 +978,139 @@ Only include matches with matchScore >= 50. Be realistic in scoring.
     throw new Error(`Failed to analyze job matches: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
+
+/**
+ * Analyze CV matches for a specific job description
+ */
+export async function analyzeCVMatches(
+  jobAnalysis: JobAnalysis,
+  cvAnalyses: CVAnalysis[]
+): Promise<JobMatch[]> {
+  try {
+    const client = getOpenAIClient();
+
+    // Create a concise summary of Job for matching
+    const jobSummary = `
+Job Summary:
+- Title: ${jobAnalysis.title}
+- Company: ${jobAnalysis.company || 'Unknown Company'}
+- Required Experience: ${jobAnalysis.experienceRequired} years
+- Required Skills: ${jobAnalysis.requiredSkills.join(', ')}
+- Requirements: ${jobAnalysis.requirements.join(', ')}
+- Location: ${jobAnalysis.location || 'Not specified'}
+`;
+
+    // Create concise CV descriptions
+    const cvDescriptions = cvAnalyses.map((cv, index) => `
+CV ${index + 1}:
+- ID: cv_${index + 1}
+- Name: ${cv.name}
+- Experience: ${cv.experienceYears} years
+- Technologies: ${cv.technologies.join(', ')}
+- Education: ${cv.education?.join(', ') || 'Not specified'}
+- Summary: ${cv.summary || 'No summary available'}
+`).join('\n');
+
+    const prompt = `
+You are an expert recruiter analyzing candidate-job compatibility. Compare this job description against multiple CVs and determine match scores.
+
+${jobSummary}
+
+Available CVs:
+${cvDescriptions}
+
+For each CV, analyze:
+1. Skill alignment (technical and soft skills)
+2. Experience level match
+3. Career progression fit
+4. Role responsibilities compatibility
+
+Return a JSON array of matches with scores >= 50%. Each match should have:
+{
+  "jobId": "cv_id",
+  "jobTitle": "candidate_name",
+  "company": "experience_summary", 
+  "matchScore": number (0-100),
+  "matchedSkills": ["skill1", "skill2"],
+  "missingSkills": ["skill3", "skill4"],
+  "experienceMatch": boolean,
+  "location": "candidate_location"
+}
+
+Note: For CV matching, jobId will be the CV ID, jobTitle will be candidate name, company will be experience summary.
+Only include matches with matchScore >= 50. Be realistic in scoring.
+`;
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert recruiter with deep knowledge of talent matching. Provide accurate, realistic match assessments for candidates against job requirements. Return valid JSON only."
+        },
+        {
+          role: "user", 
+          content: prompt
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 2000,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("No response from OpenAI");
+    }
+
+    // Parse the JSON response
+    let matches: any[];
+    try {
+      matches = JSON.parse(content);
+    } catch (parseError) {
+      logger.error("Failed to parse OpenAI CV match response", {
+        structuredData: true,
+        content,
+        parseError: parseError instanceof Error ? parseError.message : String(parseError),
+      });
+      // Return empty matches if parsing fails
+      return [];
+    }
+
+    // Validate and sanitize matches
+    const validMatches = matches
+      .filter(match => 
+        match.matchScore >= 50 && 
+        match.jobId && 
+        match.jobTitle &&
+        match.matchScore <= 100
+      )
+      .map(match => ({
+        jobId: match.jobId, // This will be the CV ID
+        jobTitle: match.jobTitle, // This will be the candidate name
+        company: match.company || "Experience not specified",
+        matchScore: Math.round(match.matchScore),
+        matchedSkills: Array.isArray(match.matchedSkills) ? match.matchedSkills : [],
+        missingSkills: Array.isArray(match.missingSkills) ? match.missingSkills : [],
+        experienceMatch: Boolean(match.experienceMatch),
+        location: match.location || "Not specified"
+      }));
+
+    logger.info("CV match analysis completed", {
+      structuredData: true,
+      totalCVs: cvAnalyses.length,
+      matchesFound: validMatches.length,
+      averageScore: validMatches.length > 0 
+        ? Math.round(validMatches.reduce((sum, m) => sum + m.matchScore, 0) / validMatches.length)
+        : 0
+    });
+
+    return validMatches;
+
+  } catch (error) {
+    logger.error("CV match analysis failed", {
+      structuredData: true,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new Error(`Failed to analyze CV matches: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}

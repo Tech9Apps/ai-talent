@@ -45,6 +45,7 @@ export interface AIProcessResponse {
 
 export interface JobMatchRequest {
   fileId: string;
+  fileType: 'cv' | 'jobDescription';
   cvAnalysisId?: string;
 }
 

@@ -298,13 +298,15 @@ export async function processFileWithAI(
  * @returns Promise with job matches
  */
 export async function findJobMatches(
-  fileId: string
+  fileId: string,
+  fileType: 'cv' | 'jobDescription'
 ): Promise<{ success: boolean; warnings: string[]; totalMatches?: number; [key: string]: unknown }> {
   try {
     const findMatches = httpsCallable(functions, "findJobMatches");
     
     const result = await findMatches({
-      fileId
+      fileId,
+      fileType
     });
 
     const data = result.data as { success: boolean; message?: string; warnings?: string[]; totalMatches?: number };
