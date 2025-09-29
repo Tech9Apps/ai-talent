@@ -8,7 +8,8 @@ import {
   Box,
   Fade,
 } from "@mui/material";
-import { CloudUpload, Person, Business, TrendingUp } from "@mui/icons-material";
+import { Person, Business } from "@mui/icons-material";
+import { ReactTyped } from "react-typed";
 import { GoogleAuthButton } from "../Auth/GoogleAuthButton";
 import { FileUploadCard } from "../FileUpload/FileUploadCard";
 import { CVAnalysisCard } from "../CVAnalysis/CVAnalysisCard";
@@ -22,12 +23,21 @@ interface WelcomeSectionProps {
 }
 
 const WelcomeSection: React.FC<WelcomeSectionProps> = ({ user }) => {
-  const getGreeting = () => {
+  const getGreetingStrings = () => {
     if (user) {
       const name = user.displayName || user.email?.split("@")[0] || "there";
-      return `Hello ${name}`;
+      return [
+        `Hello ${name}!`,
+        `Good to see you!`,
+        `Ready to pick me as the hackathon winner?`,
+        `Hello ${name}!`,
+      ];
     }
-    return "Welcome to AI-Talent";
+    return [
+      "Revolutionize Your Hiring",
+      "Smart CV Analysis",
+      "AI-Powered Matching",
+    ];
   };
 
   const getDescription = () => {
@@ -46,9 +56,18 @@ const WelcomeSection: React.FC<WelcomeSectionProps> = ({ user }) => {
           fontWeight: 500,
           color: "#EA8600",
           fontSize: { xs: "2rem", md: "2.5rem" },
+          minHeight: { xs: "3rem", md: "4rem" }, // Reserve space to prevent layout shift
         }}
       >
-        {getGreeting()}
+        <ReactTyped
+          strings={getGreetingStrings()}
+          typeSpeed={50}
+          backSpeed={30}
+          backDelay={2000}
+          loopCount={1}
+          showCursor
+          cursorChar="|"
+        />
       </Typography>
       <Typography
         variant="h6"
@@ -85,10 +104,10 @@ const GetStartedSection: React.FC<GetStartedSectionProps> = ({
   if (!user) {
     return (
       <Box>
-        <Typography variant="h5" gutterBottom sx={{ fontWeight: 500, mb: 3 }}>
+        <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 1 }}>
           Get Started
         </Typography>
-        <Card sx={{ p: 4, textAlign: "center", maxWidth: 400, mx: "auto" }}>
+        <Card sx={{ p: 4, textAlign: "center", mx: "auto" }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
               Sign in to continue
@@ -185,59 +204,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
             jobDescriptionsCount={jobDescriptionsCount}
             filesLoading={filesLoading}
           />
-
-          {/* Sample projects section (similar to Firebase console) */}
-          {!user && (
-            <Box sx={{ mb: 6 }}>
-              <Typography
-                variant="h5"
-                gutterBottom
-                sx={{ fontWeight: 500, mb: 3 }}
-              >
-                Try a sample app
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Card
-                    sx={{
-                      p: 3,
-                      cursor: "pointer",
-                      "&:hover": { boxShadow: 2 },
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <TrendingUp sx={{ mr: 2, color: "primary.main" }} />
-                      <Typography variant="h6">
-                        Try a talent matching demo
-                      </Typography>
-                    </Box>
-                    <Typography variant="body2" color="text.secondary">
-                      Experience AI-powered talent matching with sample data and
-                      explore the interface
-                    </Typography>
-                  </Card>
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Card
-                    sx={{
-                      p: 3,
-                      cursor: "pointer",
-                      "&:hover": { boxShadow: 2 },
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <CloudUpload sx={{ mr: 2, color: "primary.main" }} />
-                      <Typography variant="h6">Upload sample CV</Typography>
-                    </Box>
-                    <Typography variant="body2" color="text.secondary">
-                      Test our CV analysis features with pre-loaded sample
-                      resumes
-                    </Typography>
-                  </Card>
-                </Grid>
-              </Grid>
-            </Box>
-          )}
         </Grid>
 
         {/* Right sidebar - Projects list like Firebase */}
