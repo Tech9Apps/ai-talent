@@ -3,6 +3,19 @@ import * as logger from "firebase-functions/logger";
 import { CVAnalysis, JobAnalysis, JobMatch } from "../../../shared/types/aiTypes";
 import { extractTextFromBuffer, extractTextFromStorageFile } from "../utils/storage";
 
+/**
+ * Clean OpenAI response content by removing markdown formatting
+ */
+function cleanOpenAIResponse(content: string): string {
+  // Remove markdown code blocks
+  let cleaned = content.replace(/```json\s*/gi, '').replace(/```\s*$/g, '');
+  
+  // Remove any leading/trailing whitespace
+  cleaned = cleaned.trim();
+  
+  return cleaned;
+}
+
 
 let openai: OpenAI | null = null;
 
@@ -929,7 +942,8 @@ Only include matches with matchScore >= 50. Be realistic in scoring.
     // Parse the JSON response
     let matches: any[];
     try {
-      matches = JSON.parse(content);
+      const cleanedContent = cleanOpenAIResponse(content);
+      matches = JSON.parse(cleanedContent);
     } catch (parseError) {
       logger.error("Failed to parse OpenAI response", {
         structuredData: true,
@@ -1065,7 +1079,8 @@ Only include matches with matchScore >= 50. Be realistic in scoring.
     // Parse the JSON response
     let matches: any[];
     try {
-      matches = JSON.parse(content);
+      const cleanedContent = cleanOpenAIResponse(content);
+      matches = JSON.parse(cleanedContent);
     } catch (parseError) {
       logger.error("Failed to parse OpenAI CV match response", {
         structuredData: true,
