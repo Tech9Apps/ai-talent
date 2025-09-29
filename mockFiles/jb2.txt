@@ -1,4 +1,5 @@
 Job Description – Backend Developer
+Location: Remote
 About the Role
 
 We are looking for a Backend Developer to join our engineering team and help build scalable, secure, and high-performance services. You will work closely with frontend developers, architects, and product managers to design and implement APIs, business logic, and data storage solutions.
