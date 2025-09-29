@@ -1,23 +1,64 @@
 Jason Hume González
-Ingeniero de Software con sólida experiencia en el desarrollo de aplicaciones web y móviles, especializado en .NET, Blazor, React, Next.js y Firebase. Conocido por combinar un enfoque técnico fuerte con visión de negocio, especialmente en finanzas personales, fintech, contratación de servicios y plataformas de pagos.
 
-Experiencia Laboral
+Frontend Developer | React · Next.js · MUI · Blazor
 
-Tech9 / Prestige Financial Services (PFS) – Software Engineer
-Desarrollo de soluciones empresariales en .NET y Blazor, integración con servicios internos y externos, creación de componentes reutilizables, optimización de pipelines y despliegues en la nube.
+📍 Remote / International
+📧 [your email]
+🔗 [LinkedIn / GitHub]
 
-Proyectos Personales (Trim Success, Champions, Nubi-Go, Uber-like Services App, etc.)
-Diseño y desarrollo de aplicaciones enfocadas en finanzas personales, trading, inventario, contratación de servicios y growth personal. Enfoque en escalabilidad, experiencia de usuario y modelos de negocio innovadores.
+Professional Summary
 
-Aplicaciones Freelance / Startups
-Construcción de soluciones en Next.js, React, Firebase, Clerk, MUI, orientadas a autenticación, onboarding, dashboards financieros y módulos de pagos.
+Frontend Developer with 6+ years of experience building modern, scalable, and user-focused interfaces. Expert in React, Next.js, Material-UI, and Blazor, with a proven track record in both enterprise and startup projects. Passionate about creating fast, accessible, and responsive applications with API integrations and performance optimization.
 
-Habilidades Clave
+Work Experience
+Prestige Financial Services (Tech9) – Software Engineer
 
-Frontend: React, Next.js, Angular, MUI, Radzen, diseño responsivo.
+📅 2021 – Present
 
-Backend: .NET, C#, Firebase Functions, integración de APIs.
+Developed reusable frontend components with Blazor and React.
 
-DevOps / Infraestructura: Azure DevOps, Docker, CI/CD pipelines.
+Implemented custom MUI themes, responsive layouts, and accessibility standards.
 
-Áreas de especialidad: Finanzas, plataformas de pago, growth apps, dashboards interactivos.
+Integrated REST APIs and optimized the performance of financial dashboards.
+
+Contributed to frontend architecture discussions and best practice adoption.
+
+Freelance / Side Projects – Frontend Developer
+
+📅 2018 – Present
+
+Built web applications using React, Next.js, and Firebase.
+
+Created fintech dashboards, inventory apps, and on-demand service platforms.
+
+Implemented authentication with Clerk and Firebase Auth, onboarding flows, and user management.
+
+Applied react-hook-form, yup, and zod for advanced form validations.
+
+Delivered rapid prototyping workflows from Figma to MUI.
+
+Startup Projects (Champions, Trim Success, Nubi-Go, etc.)
+
+📅 2019 – 2023
+
+Designed and developed modern landing pages and integrated payment systems.
+
+Improved SEO and performance in Next.js (SSR/SSG).
+
+Implemented interactive charts with Recharts and Chart.js.
+
+Built modules for trading, portfolio management, and personal finance.
+
+Skills
+
+Frontend: React, Next.js, Angular, Blazor, TypeScript, JavaScript ES6+, Material-UI, TailwindCSS
+State Management: Redux, Zustand, React Query
+UI/UX: Responsive Design, Figma to Code, Accessibility (WCAG)
+Forms & Validation: react-hook-form, yup, zod
+Charts & Visualization: Recharts, Chart.js
+Backend Basics: .NET Core APIs, Firebase Functions
+DevOps / Tools: Git, Azure DevOps, Docker, CI/CD pipelines
+
+Education
+
+🎓 Bachelor’s in Software Engineering (or equivalent) – [University / Institution]

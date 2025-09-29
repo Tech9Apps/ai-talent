@@ -7,7 +7,12 @@ import {
   CircularProgress,
   Alert,
 } from "@mui/material";
-import { ArrowDownward, ArrowUpward, Remove, TrendingUp } from "@mui/icons-material";
+import {
+  ArrowDownward,
+  ArrowUpward,
+  Remove,
+  TrendingUp,
+} from "@mui/icons-material";
 import { useFileStats } from "../../contexts/hooks/useFileStats";
 import { BarChart } from "@mui/x-charts/BarChart";
 
@@ -55,9 +60,13 @@ export const FileStatsChart: React.FC = () => {
   let finalTotalCVs, finalTotalJobs;
 
   if (!hasData) {
-    // Sample data for empty state
-    finalTotalCVs = 15;
-    finalTotalJobs = 8;
+    return (
+      <Card sx={{ py: 4 }}>
+        <Alert severity="info" sx={{ m: 2 }}>
+          Start uploading files to see your totals
+        </Alert>
+      </Card>
+    );
   } else {
     finalTotalCVs = totalCVs;
     finalTotalJobs = totalJobs;
@@ -162,6 +171,7 @@ export const FileStatsChart: React.FC = () => {
                 tickLabelStyle: {
                   fontSize: 12,
                 },
+                max: Math.max(finalTotalCVs, finalTotalJobs) + 1,
                 valueFormatter: (value: number) => Math.round(value).toString(),
               },
             ]}

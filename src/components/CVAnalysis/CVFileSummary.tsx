@@ -5,7 +5,6 @@ import {
   CardContent,
   Typography,
   Chip,
-  LinearProgress,
   Divider,
   List,
   ListItem,
@@ -16,10 +15,7 @@ import {
 } from "@mui/material";
 import {
   Description,
-  Schedule,
-  CheckCircle,
   Warning,
-  Error,
   Person,
 } from "@mui/icons-material";
 import type { UserFileRecord } from "../../../shared/types/fileTypes";
@@ -32,7 +28,6 @@ interface CVFileSummaryProps {
 export const CVFileSummary: React.FC<CVFileSummaryProps> = ({ file }) => {
   const { analysis, loading: loadingAnalysis } = useCVAnalysis(file.id || "");
 
-  console.log(file.id)
 
   const getStatusColor = (
     status: string
@@ -49,36 +44,10 @@ export const CVFileSummary: React.FC<CVFileSummaryProps> = ({ file }) => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <CheckCircle color="success" />;
-      case "processing":
-        return <Schedule color="warning" />;
-      case "error":
-        return <Error color="error" />;
-      default:
-        return <Warning color="action" />;
-    }
-  };
-
   const getFileExtension = (fileName: string): string => {
     return fileName.split(".").pop()?.toUpperCase() || "Unknown";
   };
 
-  // Analysis progress based on actual data
-  const analysisProgress = {
-    textExtraction:
-      file.status === "completed" ? 100 : file.status === "processing" ? 60 : 0,
-    structureAnalysis:
-      file.status === "completed" ? 100 : file.status === "processing" ? 40 : 0,
-    skillsDetection:
-      file.status === "completed" ? 100 : file.status === "processing" ? 20 : 0,
-    aiInsights: file.status === "completed" ? 100 : 0,
-  };
-
-
-  console.log(analysis)
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {/* File Information */}
@@ -94,7 +63,6 @@ export const CVFileSummary: React.FC<CVFileSummaryProps> = ({ file }) => {
                 {getFileExtension(file.fileName)} Document
               </Typography>
             </Box>
-            <Box>{getStatusIcon(file.status)}</Box>
           </Box>
 
           <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
@@ -115,78 +83,43 @@ export const CVFileSummary: React.FC<CVFileSummaryProps> = ({ file }) => {
         </CardContent>
       </Card>
 
-      {/* Analysis Progress */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" sx={{ fontWeight: 500, mb: 2 }}>
-            Analysis Progress
-          </Typography>
-
-          <Box sx={{ mb: 3 }}>
-            <Box
-              sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
-            >
-              <Typography variant="body2">Text Extraction</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {analysisProgress.textExtraction}%
+      {/* Warnings Card - Show if analysis is complete and warnings exist */}
+      {analysis && analysis.warnings && analysis.warnings.length > 0 && (
+        <Card>
+          <CardContent>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+              <Warning color="warning" />
+              <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                Analysis Warnings ({analysis.warnings.length})
               </Typography>
             </Box>
-            <LinearProgress
-              variant="determinate"
-              value={analysisProgress.textExtraction}
-              sx={{ height: 6, borderRadius: 3 }}
-            />
-          </Box>
+            <Divider sx={{ mb: 2 }} />
 
-          <Box sx={{ mb: 3 }}>
-            <Box
-              sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
-            >
-              <Typography variant="body2">Structure Analysis</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {analysisProgress.structureAnalysis}%
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Typography variant="body2">
+                The following issues were detected during analysis:
               </Typography>
-            </Box>
-            <LinearProgress
-              variant="determinate"
-              value={analysisProgress.structureAnalysis}
-              sx={{ height: 6, borderRadius: 3 }}
-            />
-          </Box>
+            </Alert>
 
-          <Box sx={{ mb: 3 }}>
-            <Box
-              sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
-            >
-              <Typography variant="body2">Skills Detection</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {analysisProgress.skillsDetection}%
-              </Typography>
-            </Box>
-            <LinearProgress
-              variant="determinate"
-              value={analysisProgress.skillsDetection}
-              sx={{ height: 6, borderRadius: 3 }}
-            />
-          </Box>
-
-          <Box>
-            <Box
-              sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
-            >
-              <Typography variant="body2">AI Insights</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {analysisProgress.aiInsights}%
-              </Typography>
-            </Box>
-            <LinearProgress
-              variant="determinate"
-              value={analysisProgress.aiInsights}
-              sx={{ height: 6, borderRadius: 3 }}
-            />
-          </Box>
-        </CardContent>
-      </Card>
+            <List dense>
+              {analysis.warnings.map((warning: string, index: number) => (
+                <ListItem key={index} sx={{ py: 0.5 }}>
+                  <ListItemIcon sx={{ minWidth: 32 }}>
+                    <Warning fontSize="small" color="warning" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={
+                      <Typography variant="body2" color="text.secondary">
+                        {warning}
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Profile Information - Only show if analysis is available */}
       {file.status === "completed" && (

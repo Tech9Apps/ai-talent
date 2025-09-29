@@ -34,7 +34,7 @@ async function handleChatFileAnalysis(
 ): Promise<ChatFileAnalysisResponse> {
   const { question, fileId } = request.data;
   const { userId } = context;
-  
+
   try {
     if (!question || !fileId) {
       throw new HttpsError(
@@ -51,10 +51,7 @@ async function handleChatFileAnalysis(
     }
 
     if (typeof fileId !== "string") {
-      throw new HttpsError(
-        "invalid-argument",
-        "File ID must be a string"
-      );
+      throw new HttpsError("invalid-argument", "File ID must be a string");
     }
 
     logger.info("Processing chat request", {
@@ -72,7 +69,7 @@ async function handleChatFileAnalysis(
       .doc(fileId);
 
     const fileDoc = await userFilesRef.get();
-    
+
     if (!fileDoc.exists) {
       throw new HttpsError(
         "not-found",
@@ -82,27 +79,13 @@ async function handleChatFileAnalysis(
 
     const fileData = fileDoc.data();
     if (!fileData) {
-      throw new HttpsError(
-        "not-found",
-        "File data not found"
-      );
-    }
-
-    // Check if file is processed
-    if (fileData.status !== "completed") {
-      throw new HttpsError(
-        "failed-precondition",
-        "File is still being processed. Please wait until processing is complete."
-      );
+      throw new HttpsError("not-found", "File data not found");
     }
 
     // Get file storage path
     const storagePath = fileData.storagePath;
     if (!storagePath) {
-      throw new HttpsError(
-        "not-found",
-        "File storage path not found"
-      );
+      throw new HttpsError("not-found", "File storage path not found");
     }
 
     logger.info("File found, proceeding with AI chat", {
@@ -114,10 +97,13 @@ async function handleChatFileAnalysis(
 
     // Get available jobs for context (only if user is asking about CV analysis or matching)
     let jobsContext: string | undefined;
-    
+
     // Check if question is about job matching, improvement, or comparison
-    const isJobRelatedQuestion = /job|position|match|improve|compare|role|skill|requirement|experience|qualification/i.test(question);
-    
+    const isJobRelatedQuestion =
+      /job|position|match|improve|compare|role|skill|requirement|experience|qualification/i.test(
+        question
+      );
+
     if (isJobRelatedQuestion) {
       try {
         const jobsSnapshot = await admin
@@ -128,19 +114,25 @@ async function handleChatFileAnalysis(
           .get();
 
         if (!jobsSnapshot.empty) {
-          const jobsSummary = jobsSnapshot.docs.map(doc => {
+          const jobsSummary = jobsSnapshot.docs.map((doc) => {
             const jobData = doc.data();
             return {
               title: jobData.title || "Unknown Position",
-              company: jobData.company || "Unknown Company", 
+              company: jobData.company || "Unknown Company",
               requiredSkills: jobData.requiredSkills || [],
               experienceRequired: jobData.experienceRequired || 0,
-              description: jobData.description ? jobData.description.substring(0, 200) + "..." : ""
+              description: jobData.description
+                ? jobData.description.substring(0, 200) + "..."
+                : "",
             };
           });
 
-          jobsContext = `Available job opportunities for comparison:\n${JSON.stringify(jobsSummary, null, 2)}`;
-          
+          jobsContext = `Available job opportunities for comparison:\n${JSON.stringify(
+            jobsSummary,
+            null,
+            2
+          )}`;
+
           logger.info("Added jobs context", {
             userId,
             jobsCount: jobsSummary.length,
@@ -172,17 +164,14 @@ async function handleChatFileAnalysis(
 
     // Log the chat interaction for analytics (optional)
     try {
-      await admin
-        .firestore()
-        .collection("chatLogs")
-        .add({
-          userId,
-          fileId,
-          fileName: fileData.fileName,
-          question,
-          response: aiResponse,
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        });
+      await admin.firestore().collection("chatLogs").add({
+        userId,
+        fileId,
+        fileName: fileData.fileName,
+        question,
+        response: aiResponse,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
     } catch (logError) {
       // Don't fail the request if logging fails
       logger.warn("Failed to log chat interaction", {

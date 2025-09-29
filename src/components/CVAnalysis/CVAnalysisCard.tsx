@@ -23,7 +23,8 @@ export const CVAnalysisCard: React.FC<CVAnalysisCardProps> = ({
 
   const handleAnalysisClick = () => {
     if (cvFile?.id) {
-      navigate(`/cv/${cvFile.id}`);
+      const defaultQuestion = "How can I improve my CV to better match the job descriptions available in the system? What skills or experience am I missing?";
+      navigate(`/cv/${cvFile.id}?q=${encodeURIComponent(defaultQuestion)}`);
     }
   };
 

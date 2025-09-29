@@ -47,7 +47,7 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
   ]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [hasProcessedQuery, setHasProcessedQuery] = useState(false);
+  const hasProcessedQueryRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatFileAnalysis = httpsCallable(functions, "chatFileAnalysis");
 
@@ -117,19 +117,22 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
     scrollToBottom();
   }, [messages]);
 
-  // Process query parameter on component mount
+  // Process query parameter on component mount - runs only once
   useEffect(() => {
     const queryQuestion = searchParams.get('q');
-    if (queryQuestion && !hasProcessedQuery && !isLoading) {
-      setHasProcessedQuery(true);
+    if (queryQuestion && !hasProcessedQueryRef.current) {
+      hasProcessedQueryRef.current = true;
       // Clear the query parameter from URL
       const newSearchParams = new URLSearchParams(searchParams);
       newSearchParams.delete('q');
       setSearchParams(newSearchParams, { replace: true });
-      // Process the question
-      sendMessage(queryQuestion);
+      // Process the question after a short delay to ensure component is ready
+      setTimeout(() => {
+        sendMessage(queryQuestion);
+      }, 100);
     }
-  }, [searchParams, hasProcessedQuery, isLoading, setSearchParams, sendMessage]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only run once on mount
 
   const handleSendMessage = () => {
     if (!inputText.trim()) return;
