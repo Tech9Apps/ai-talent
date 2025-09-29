@@ -176,26 +176,32 @@ export const AnalyticsPage: React.FC = () => {
   return (
     <Container sx={{ py: 4 }}>
       {/* Header */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          mb: 3,
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center" }}>
-          <Button
-            onClick={handleBackClick}
-            startIcon={<ArrowBack />}
-            sx={{ mr: 2 }}
-          >
-            Back to Dashboard
-          </Button>
-          <Typography variant="h4" component="h1" fontWeight="bold">
-            Analytics
-          </Typography>
-        </Box>
+      <Box sx={{ mb: 6 }}>
+        <Button
+          onClick={handleBackClick}
+          startIcon={<ArrowBack />}
+          sx={{ mb: 2 }}
+        >
+          Back to Dashboard
+        </Button>
+        <Typography
+          variant="h3"
+          component="h1"
+          sx={{
+            fontWeight: 500,
+            color: "#EA8600",
+            fontSize: { xs: "2rem", md: "2.5rem" },
+          }}
+        >
+          Analytics
+        </Typography>
+        <Typography
+          variant="h6"
+          color="text.secondary"
+          sx={{ fontWeight: 300, mt: 1 }}
+        >
+          Overview of uploaded CVs and job descriptions
+        </Typography>
       </Box>
 
       {/* Tabs */}
@@ -220,7 +226,7 @@ export const AnalyticsPage: React.FC = () => {
           <TabPanel value={tabValue} index={0}>
             <Box sx={{ width: "100%" }}>
               <DataGrid
-              rowHeight={60}
+                rowHeight={60}
                 rows={cvs}
                 columns={cvColumns}
                 initialState={{
