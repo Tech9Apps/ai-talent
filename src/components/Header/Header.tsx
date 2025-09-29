@@ -2,13 +2,8 @@ import React from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { AppBar, Toolbar, Typography, Box } from "@mui/material";
 import { SmartToy } from "@mui/icons-material";
-import type { User } from "../../types";
 
-interface HeaderProps {
-  user: User | null;
-}
-
-export const Header: React.FC<HeaderProps> = ({ user }) => {
+export const Header: React.FC = () => {
   const navigate = useNavigate();
 
   const handleNavigateHome = () => {
@@ -42,32 +37,30 @@ export const Header: React.FC<HeaderProps> = ({ user }) => {
             AI-Talent
           </Typography>
 
-          {user && (
-            <Link
-              to="/analytics"
-              style={{
-                marginLeft: 32,
-                color: "inherit",
-                textDecoration: "none",
+          <Link
+            to="/analytics"
+            style={{
+              marginLeft: 32,
+              color: "inherit",
+              textDecoration: "none",
+              fontSize: "0.875rem",
+            }}
+          >
+            <Typography
+              variant="body2"
+              component="span"
+              sx={{
+                color: "text.primary",
                 fontSize: "0.875rem",
+                "&:hover": {
+                  color: "primary.main",
+                  textDecoration: "underline",
+                },
               }}
             >
-              <Typography
-                variant="body2"
-                component="span"
-                sx={{
-                  color: "text.primary",
-                  fontSize: "0.875rem",
-                  "&:hover": {
-                    color: "primary.main",
-                    textDecoration: "underline",
-                  },
-                }}
-              >
-                Analytics
-              </Typography>
-            </Link>
-          )}
+              Analytics
+            </Typography>
+          </Link>
         </Box>
       </Toolbar>
     </AppBar>
