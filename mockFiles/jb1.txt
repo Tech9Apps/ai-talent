@@ -1,0 +1,51 @@
+Job Description – Software Engineer
+Location: Remote
+Salary: Competitive, based on experience
+Company: Tech9 Innovations
+About the Role
+
+We are looking for a Software Engineer to join our growing team. The ideal candidate has strong technical skills in C#/.NET, React, and cloud environments, and enjoys working on scalable applications that impact thousands of users daily.
+
+Responsibilities
+
+Design, develop, and maintain web applications using .NET and React/Next.js.
+
+Collaborate with cross-functional teams to define, design, and ship new features.
+
+Write clean, testable, and maintainable code.
+
+Participate in code reviews and contribute to continuous improvement.
+
+Troubleshoot, debug, and optimize applications for performance and scalability.
+
+Contribute to architectural discussions and propose innovative solutions.
+
+Requirements
+
+Bachelor’s degree in Computer Science, Engineering, or equivalent experience.
+
+3+ years of experience with C#/.NET and modern JavaScript frameworks (React, Angular, or Vue).
+
+Experience with REST APIs, SQL/NoSQL databases, and cloud platforms (Azure, AWS, or GCP).
+
+Strong understanding of software design principles and CI/CD pipelines.
+
+Good communication skills and ability to work in an agile team.
+
+Nice to Have
+
+Experience with Blazor or Firebase.
+
+Knowledge of financial systems or fintech platforms.
+
+Familiarity with DevOps practices and containerization (Docker, Kubernetes).
+
+Benefits
+
+Competitive salary and performance bonuses.
+
+Remote-first culture with flexible working hours.
+
+Professional growth opportunities and budget for training/certifications.
+
+Health insurance, paid time off, and wellness benefits.

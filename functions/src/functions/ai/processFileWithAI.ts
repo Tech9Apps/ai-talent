@@ -1,0 +1,323 @@
+/**
+ * AI Processing Firebase Function
+ * Analyzes uploaded CV/Job Description files using OpenAI
+ */
+
+import {
+  onCall,
+  CallableRequest,
+  HttpsError,
+} from "firebase-functions/v2/https";
+import * as admin from "firebase-admin";
+import * as logger from "firebase-functions/logger";
+import {
+  withAuthentication,
+  AuthenticatedContext,
+} from "../../middleware/auth";
+import {
+  AIAnalysisRequest,
+  AIAnalysisResult,
+  AIProcessResponse,
+  CVAnalysis,
+  JobAnalysis,
+} from "../../../../shared/types/aiTypes";
+import { analyzeCVWithOpenAI, analyzeJobWithOpenAI, analyzeStorageFileWithOpenAI, analyzeFileWithOpenAI } from "../../services/openaiService";
+import { FILE_VALIDATION_CONFIG } from "@shared/index";
+
+/**
+ * Stores AI analysis results in Firestore
+ */
+async function storeAIAnalysis(
+  userId: string,
+  fileId: string,
+  analysis: AIAnalysisResult,
+  uploadType: "cv" | "jobDescription"
+): Promise<void> {
+  try {
+    const batch = admin.firestore().batch();
+
+    // Update the file processing record
+    const fileProcessingRef = admin
+      .firestore()
+      .collection("fileProcessing")
+      .where("fileId", "==", fileId)
+      .where("userId", "==", userId);
+
+    const fileProcessingSnapshot = await fileProcessingRef.get();
+    if (!fileProcessingSnapshot.empty) {
+      const doc = fileProcessingSnapshot.docs[0];
+      batch.update(doc.ref, {
+        aiProcessed: true,
+        aiProcessedAt: admin.firestore.FieldValue.serverTimestamp(),
+        aiResults: analysis,
+      });
+    }
+
+    // Store in specialized collection (cvs or jobs) using fileId as document ID
+    const collectionName = uploadType === "cv" ? "cvs" : "jobs";
+    const specializedRef = admin.firestore().collection(collectionName).doc(fileId);
+
+    batch.set(specializedRef, {
+      userId,
+      fileId,
+      ...analysis,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+
+    logger.info("Stored AI analysis results", {
+      structuredData: true,
+      userId,
+      fileId,
+      uploadType,
+      collectionName,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Failed to store AI analysis", {
+      structuredData: true,
+      userId,
+      fileId,
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
+    });
+    throw error;
+  }
+}
+
+/**
+ * Main handler for AI processing
+ */
+async function handleAIProcessing(
+  request: CallableRequest<AIAnalysisRequest>,
+  context: AuthenticatedContext
+): Promise<AIProcessResponse> {
+  const { fileId, uploadType } = request.data;
+  const { userId } = context;
+
+  try {
+    // Validate input
+    if (!fileId || !uploadType) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Missing required parameters: fileId, uploadType"
+      );
+    }
+
+    if (!["cv", "jobDescription"].includes(uploadType)) {
+      throw new HttpsError(
+        "invalid-argument",
+        'Invalid uploadType. Must be "cv" or "jobDescription"'
+      );
+    }
+
+    logger.info("Starting AI analysis", {
+      structuredData: true,
+      userId,
+      fileId,
+      uploadType
+    });
+
+    // Get file information from Firestore
+    const userFileRef = admin
+      .firestore()
+      .collection("users")
+      .doc(userId)
+      .collection("files")
+      .doc(fileId);
+
+    const fileDoc = await userFileRef.get();
+    if (!fileDoc.exists) {
+      throw new HttpsError("not-found", "File not found");
+    }
+
+    const fileData = fileDoc.data();
+    const storagePath = fileData?.storagePath;
+
+    if (!storagePath) {
+      throw new HttpsError("invalid-argument", "File storage path not found");
+    }
+
+    // Get file information and validate size
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(storagePath);
+    const [metadata] = await file.getMetadata();
+    const sizeBytes = Number(metadata.size || 0);
+    const MAX_SIZE_BYTES = FILE_VALIDATION_CONFIG.maxSizeBytes; 
+    
+    logger.info("File metadata retrieved", {
+      structuredData: true,
+      fileName: metadata.name,
+      sizeBytes,
+      contentType: metadata.contentType,
+    });
+    
+    if (sizeBytes > MAX_SIZE_BYTES) {
+      logger.error('File too large', { 
+        structuredData: true, 
+        userId, 
+        fileId, 
+        sizeBytes, 
+        max: MAX_SIZE_BYTES 
+      });
+      throw new HttpsError('failed-precondition', 'File exceeds size limit');
+    }
+
+    // Try file-based analysis first (preferred for file uploads)
+    let analysis: AIAnalysisResult;
+    let processingMethod = 'unknown';
+    
+    try {
+      const parsed = await analyzeStorageFileWithOpenAI(
+        storagePath, 
+        metadata.name || 'uploaded_file', 
+        uploadType === 'cv' ? 'cv' : 'job'
+      );
+      
+      processingMethod = 'file-based-stream';
+      
+      // Map parsed results to proper analysis format
+      if (uploadType === 'cv') {
+        analysis = {
+          jobHistory: parsed.jobHistory || [],
+          technologies: parsed.technologies || [],
+          experienceYears: parsed.experienceYears || 0,
+          education: parsed.education || [],
+          warnings: parsed.warnings || []
+        } as CVAnalysis;
+        if (parsed.name) (analysis as CVAnalysis).name = parsed.name;
+        if (parsed.email) (analysis as CVAnalysis).email = parsed.email;
+        if (parsed.phone) (analysis as CVAnalysis).phone = parsed.phone;
+        if (parsed.location) (analysis as CVAnalysis).location = parsed.location;
+        if (parsed.summary) (analysis as CVAnalysis).summary = parsed.summary;
+      } else {
+        analysis = {
+          title: parsed.title || 'Unknown Position',
+          requiredSkills: parsed.requiredSkills || [],
+          experienceRequired: parsed.experienceRequired || 0,
+          description: parsed.description || '',
+          requirements: parsed.requirements || [],
+          warnings: []
+        } as JobAnalysis;
+        if (parsed.company) (analysis as JobAnalysis).company = parsed.company;
+        if (parsed.location) (analysis as JobAnalysis).location = parsed.location;
+        if (parsed.salary) (analysis as JobAnalysis).salary = parsed.salary;
+      }
+      
+    } catch (fileAnalysisError) {
+      logger.warn("File-based analysis failed, trying buffer fallback", {
+        structuredData: true,
+        error: fileAnalysisError instanceof Error ? fileAnalysisError.message : String(fileAnalysisError)
+      });
+      
+      try {
+        const [buffer] = await file.download();
+        
+        const parsed = await analyzeFileWithOpenAI(
+          buffer, 
+          metadata.name || 'uploaded_file', 
+          uploadType === 'cv' ? 'cv' : 'job'
+        );
+        
+        processingMethod = 'file-based-buffer';
+        
+        // Map parsed results to proper analysis format
+        if (uploadType === 'cv') {
+          analysis = {
+            jobHistory: parsed.jobHistory || [],
+            technologies: parsed.technologies || [],
+            experienceYears: parsed.experienceYears || 0,
+            education: parsed.education || [],
+            warnings: parsed.warnings || []
+          } as CVAnalysis;
+          if (parsed.name) (analysis as CVAnalysis).name = parsed.name;
+          if (parsed.email) (analysis as CVAnalysis).email = parsed.email;
+          if (parsed.phone) (analysis as CVAnalysis).phone = parsed.phone;
+          if (parsed.location) (analysis as CVAnalysis).location = parsed.location;
+          if (parsed.summary) (analysis as CVAnalysis).summary = parsed.summary;
+        } else {
+          analysis = {
+            title: parsed.title || 'Unknown Position',
+            requiredSkills: parsed.requiredSkills || [],
+            experienceRequired: parsed.experienceRequired || 0,
+            description: parsed.description || '',
+            requirements: parsed.requirements || [],
+            warnings: parsed.warnings || []
+          } as JobAnalysis;
+          if (parsed.company) (analysis as JobAnalysis).company = parsed.company;
+          if (parsed.location) (analysis as JobAnalysis).location = parsed.location;
+          if (parsed.salary) (analysis as JobAnalysis).salary = parsed.salary;
+        }
+        
+      } catch (bufferAnalysisError) {
+        logger.warn("Buffer-based analysis also failed, trying text fallback", {
+          structuredData: true,
+          error: bufferAnalysisError instanceof Error ? bufferAnalysisError.message : String(bufferAnalysisError)
+        });
+        
+        // Final fallback: download again and convert to text
+        const [textBuffer] = await file.download();
+        const fileText = textBuffer.toString('utf8');
+        
+        if (uploadType === 'cv') {
+          analysis = await analyzeCVWithOpenAI(fileText);
+        } else {
+          analysis = await analyzeJobWithOpenAI(fileText);
+        }
+        
+        processingMethod = 'text-fallback';
+      }
+    }
+
+    // Store results
+    await storeAIAnalysis(userId, fileId, analysis, uploadType);
+
+    const response: AIProcessResponse = {
+      success: true,
+      message: `${
+        uploadType === "cv" ? "CV" : "Job description"
+      } analyzed successfully`,
+      fileId,
+      analysis,
+      warnings: "warnings" in analysis ? analysis.warnings : [],
+      processedAt: new Date().toISOString(),
+    };
+
+    logger.info("AI analysis completed successfully", {
+      structuredData: true,
+      uploadType,
+      warningsCount: "warnings" in analysis ? analysis.warnings.length : 0,
+      processingMethod
+    });
+
+    return response;
+  } catch (error) {
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error("AI processing failed", {
+      structuredData: true,
+      error: errorMessage
+    });
+
+    throw new HttpsError(
+      "internal",
+      "Failed to process file with AI. Please try again later."
+    );
+  }
+}
+
+/**
+ * Cloud Function to process files with AI
+ */
+export const processFileWithAI = onCall<
+  AIAnalysisRequest,
+  Promise<AIProcessResponse>
+>({
+  memory: '512MiB',
+  timeoutSeconds: 120,
+}, withAuthentication(handleAIProcessing));
