@@ -17,6 +17,7 @@ import { AuthProvider } from './contexts/AuthContext';
 // Pages
 import { HomePage } from './pages/HomePage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { CVAnalysisPage } from './pages/CVAnalysisPage';
 
 // Hooks
 import { useAuthContext } from './contexts/hooks/useAuthContext';
@@ -140,6 +141,10 @@ function AppContent() {
             <Route 
               path="/analytics" 
               element={user ? <AnalyticsPage /> : <HomePage user={user} onAuthSuccess={handleAuthSuccess} onAuthError={handleAuthError} />} 
+            />
+            <Route 
+              path="/cv/:id" 
+              element={user ? <CVAnalysisPage /> : <HomePage user={user} onAuthSuccess={handleAuthSuccess} onAuthError={handleAuthError} />} 
             />
           </Routes>
         </Box>

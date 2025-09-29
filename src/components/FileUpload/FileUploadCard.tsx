@@ -15,7 +15,7 @@ import {
   DialogActions,
   Button,
 } from "@mui/material";
-import { CloudUpload, CheckCircle, Description } from "@mui/icons-material";
+import { CloudUpload, CheckCircle, Description, Business } from "@mui/icons-material";
 import {
   uploadFile,
   processFileWithAI,
@@ -26,7 +26,7 @@ import {
   validateFile,
 } from "../../utils/functions";
 import { FILE_VALIDATION_CONFIG, SUPPORTED_FILE_TYPES } from "../../../shared";
-import { useUserFiles } from "../../contexts/hooks/useUserFiles";
+import type { UserFileRecord } from "../../../shared/types/fileTypes";
 
 type ProcessStep = {
   id: number;
@@ -40,6 +40,10 @@ interface FileUploadCardProps {
   title: string;
   description: string;
   icon: React.ReactNode;
+  // Props for file information
+  cvFile?: UserFileRecord | null;
+  jobDescriptionsCount?: number;
+  filesLoading?: boolean;
 }
 
 export const FileUploadCard: React.FC<FileUploadCardProps> = ({
@@ -47,9 +51,10 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
   title,
   description,
   icon,
+  cvFile,
+  jobDescriptionsCount,
+  filesLoading = false,
 }) => {
-  // Get user files data
-  const { cvFile, loading: filesLoading } = useUserFiles();
 
   // Get accepted file types from shared constants
   const acceptedFiles = SUPPORTED_FILE_TYPES[type].join(",");
@@ -310,6 +315,38 @@ export const FileUploadCard: React.FC<FileUploadCardProps> = ({
                   </Typography>
                 </Box>
                 <Chip label={cvFile.status} size="small" color="secondary" />
+              </Box>
+            )}
+
+            {/* Show job descriptions count if this is a job description upload card */}
+            {type === "jobDescription" && !filesLoading && !isProcessing && (
+              <Box
+                sx={{
+                  mt: 1,
+                  p: 2,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 1,
+                  backgroundColor: "background.paper",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <Business sx={{ color: "primary.main" }} />
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    {jobDescriptionsCount || 0} Job Description{jobDescriptionsCount !== 1 ? 's' : ''} uploaded
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Click to add more job descriptions
+                  </Typography>
+                </Box>
+                <Chip 
+                  label={`${jobDescriptionsCount || 0} Total`} 
+                  size="small" 
+                  color="secondary" 
+                />
               </Box>
             )}
 

@@ -9,6 +9,7 @@ import {
   Chip,
   TextField,
   InputAdornment,
+  Fade,
 } from "@mui/material";
 import {
   CloudUpload,
@@ -19,7 +20,10 @@ import {
 } from "@mui/icons-material";
 import { GoogleAuthButton } from "../Auth/GoogleAuthButton";
 import { FileUploadCard } from "../FileUpload/FileUploadCard";
+import { CVAnalysisCard } from "../CVAnalysis/CVAnalysisCard";
+import { useUserFiles } from "../../contexts/hooks/useUserFiles";
 import type { User } from "../../types";
+import type { UserFileRecord } from "../../../shared/types/fileTypes";
 
 interface WelcomeSectionProps {
   user: User | null;
@@ -73,16 +77,22 @@ interface GetStartedSectionProps {
   user: User | null;
   onAuthSuccess?: () => void;
   onAuthError?: (error: string) => void;
+  cvFile?: UserFileRecord | null;
+  jobDescriptionsCount?: number;
+  filesLoading?: boolean;
 }
 
 const GetStartedSection: React.FC<GetStartedSectionProps> = ({
   user,
   onAuthSuccess,
   onAuthError,
+  cvFile,
+  jobDescriptionsCount,
+  filesLoading,
 }) => {
   if (!user) {
     return (
-      <Box sx={{ mb: 6 }}>
+      <Box>
         <Typography variant="h5" gutterBottom sx={{ fontWeight: 500, mb: 3 }}>
           Get Started
         </Typography>
@@ -107,7 +117,7 @@ const GetStartedSection: React.FC<GetStartedSectionProps> = ({
 
   return (
     <Box>
-      <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 2 }}>
+      <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 1 }}>
         Get Started
       </Typography>
       <Grid container spacing={1}>
@@ -117,6 +127,8 @@ const GetStartedSection: React.FC<GetStartedSectionProps> = ({
             title="Upload Resume"
             description="Upload your resume to get AI-powered job matching and optimization suggestions"
             icon={<Person sx={{ fontSize: 40, color: "#1976d2" }} />}
+            cvFile={cvFile}
+            filesLoading={filesLoading}
           />
         </Grid>
         <Grid size={12}>
@@ -125,8 +137,28 @@ const GetStartedSection: React.FC<GetStartedSectionProps> = ({
             title="Upload Job Description"
             description="Upload job descriptions to find the best matching candidates from your talent pool"
             icon={<Business sx={{ fontSize: 40, color: "#1976d2" }} />}
+            jobDescriptionsCount={jobDescriptionsCount}
+            filesLoading={filesLoading}
           />
         </Grid>
+
+        {/* CV Analysis Card - Only show if user has a CV */}
+        <Fade in={Boolean(cvFile && !filesLoading)} timeout={250}>
+          <Box>
+            <Typography
+              variant="subtitle1"
+              color="text.secondary"
+              sx={{ mb: 1, mt: 4 }}
+            >
+              CV Analysis
+            </Typography>
+            <Grid size={12}>
+              {cvFile && (
+                <CVAnalysisCard cvFile={cvFile} filesLoading={filesLoading} />
+              )}
+            </Grid>
+          </Box>
+        </Fade>
       </Grid>
     </Box>
   );
@@ -143,6 +175,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onAuthSuccess,
   onAuthError,
 }) => {
+  // Get user files data
+  const { cvFile, jobDescriptionFiles, loading: filesLoading } = useUserFiles();
+  const jobDescriptionsCount = jobDescriptionFiles?.length || 0;
+
   return (
     <Container sx={{ py: 4 }}>
       <Grid container spacing={8}>
@@ -153,6 +189,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             user={user}
             onAuthSuccess={onAuthSuccess}
             onAuthError={onAuthError}
+            cvFile={cvFile}
+            jobDescriptionsCount={jobDescriptionsCount}
+            filesLoading={filesLoading}
           />
 
           {/* Sample projects section (similar to Firebase console) */}
