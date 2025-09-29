@@ -10,11 +10,7 @@ import {
   CircularProgress,
   Chip,
 } from "@mui/material";
-import {
-  Send,
-  SmartToy,
-  Person,
-} from "@mui/icons-material";
+import { Send, SmartToy, Person } from "@mui/icons-material";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../../firebase";
 import { useSearchParams } from "react-router-dom";
@@ -55,63 +51,66 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const sendMessage = useCallback(async (messageText: string) => {
-    if (!messageText.trim() || isLoading) return;
+  const sendMessage = useCallback(
+    async (messageText: string) => {
+      if (!messageText.trim() || isLoading) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: messageText,
-      sender: "user",
-      timestamp: new Date(),
-    };
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        text: messageText,
+        sender: "user",
+        timestamp: new Date(),
+      };
 
-    const loadingMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      text: "",
-      sender: "ai",
-      timestamp: new Date(),
-      loading: true,
-    };
+      const loadingMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "",
+        sender: "ai",
+        timestamp: new Date(),
+        loading: true,
+      };
 
-    setMessages((prev) => [...prev, userMessage, loadingMessage]);
-    setIsLoading(true);
+      setMessages((prev) => [...prev, userMessage, loadingMessage]);
+      setIsLoading(true);
 
-    try {
-      const result = await chatFileAnalysis({
-        question: messageText,
-        fileId: fileId,
-      });
+      try {
+        const result = await chatFileAnalysis({
+          question: messageText,
+          fileId: fileId,
+        });
 
-      const response = result.data as { response: string };
+        const response = result.data as { response: string };
 
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === loadingMessage.id
-            ? {
-                ...msg,
-                text: response.response,
-                loading: false,
-              }
-            : msg
-        )
-      );
-    } catch (error) {
-      console.error("Error calling chat function:", error);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === loadingMessage.id
-            ? {
-                ...msg,
-                text: "Sorry, I encountered an error while analyzing your request. Please try again.",
-                loading: false,
-              }
-            : msg
-        )
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isLoading, chatFileAnalysis, fileId]);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === loadingMessage.id
+              ? {
+                  ...msg,
+                  text: response.response,
+                  loading: false,
+                }
+              : msg
+          )
+        );
+      } catch (error) {
+        console.error("Error calling chat function:", error);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === loadingMessage.id
+              ? {
+                  ...msg,
+                  text: "Sorry, I encountered an error while analyzing your request. Please try again.",
+                  loading: false,
+                }
+              : msg
+          )
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isLoading, chatFileAnalysis, fileId]
+  );
 
   useEffect(() => {
     scrollToBottom();
@@ -119,19 +118,19 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
 
   // Process query parameter on component mount - runs only once
   useEffect(() => {
-    const queryQuestion = searchParams.get('q');
+    const queryQuestion = searchParams.get("q");
     if (queryQuestion && !hasProcessedQueryRef.current) {
       hasProcessedQueryRef.current = true;
       // Clear the query parameter from URL
       const newSearchParams = new URLSearchParams(searchParams);
-      newSearchParams.delete('q');
+      newSearchParams.delete("q");
       setSearchParams(newSearchParams, { replace: true });
       // Process the question after a short delay to ensure component is ready
       setTimeout(() => {
         sendMessage(queryQuestion);
       }, 100);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array - only run once on mount
 
   const handleSendMessage = () => {
@@ -149,8 +148,6 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
 
   const suggestedQuestions = [
     "What are the key skills mentioned?",
-    "How can this CV be improved?",
-    "What job roles would fit this profile?",
     "Are there any missing sections?",
   ];
 
@@ -160,7 +157,9 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
 
   return (
     <Card sx={{ height: "600px", display: "flex", flexDirection: "column" }}>
-      <CardContent sx={{ flexGrow: 1, display: "flex", flexDirection: "column", p: 0 }}>
+      <CardContent
+        sx={{ flexGrow: 1, display: "flex", flexDirection: "column", p: 0 }}
+      >
         {/* Header */}
         <Box sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}>
           <Typography variant="body2" color="text.secondary">
@@ -185,21 +184,30 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
               key={message.id}
               sx={{
                 display: "flex",
-                justifyContent: message.sender === "user" ? "flex-end" : "flex-start",
+                justifyContent:
+                  message.sender === "user" ? "flex-end" : "flex-start",
                 alignItems: "flex-start",
                 gap: 1,
               }}
             >
               {message.sender === "ai" && (
-                <SmartToy sx={{ color: "primary.main", mt: 0.5, fontSize: 20 }} />
+                <SmartToy
+                  sx={{ color: "primary.main", mt: 0.5, fontSize: 20 }}
+                />
               )}
-              
+
               <Paper
                 sx={{
                   p: 2,
                   maxWidth: "80%",
-                  bgcolor: message.sender === "user" ? "primary.main" : "background.paper",
-                  color: message.sender === "user" ? "primary.contrastText" : "text.primary",
+                  bgcolor:
+                    message.sender === "user"
+                      ? "primary.main"
+                      : "background.paper",
+                  color:
+                    message.sender === "user"
+                      ? "primary.contrastText"
+                      : "text.primary",
                   border: message.sender === "ai" ? 1 : 0,
                   borderColor: "divider",
                 }}
@@ -217,7 +225,9 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
               </Paper>
 
               {message.sender === "user" && (
-                <Person sx={{ color: "text.secondary", mt: 0.5, fontSize: 20 }} />
+                <Person
+                  sx={{ color: "text.secondary", mt: 0.5, fontSize: 20 }}
+                />
               )}
             </Box>
           ))}
@@ -225,25 +235,23 @@ export const CVChatInterface: React.FC<CVChatInterfaceProps> = ({
         </Box>
 
         {/* Suggested Questions */}
-        {messages.length === 1 && (
-          <Box sx={{ p: 2, pt: 0 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Try asking:
-            </Typography>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {suggestedQuestions.map((question, index) => (
-                <Chip
-                  key={index}
-                  label={question}
-                  variant="outlined"
-                  size="small"
-                  onClick={() => handleSuggestedQuestion(question)}
-                  sx={{ cursor: "pointer" }}
-                />
-              ))}
-            </Box>
+        <Box sx={{ p: 2, pt: 0 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Try asking:
+          </Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+            {suggestedQuestions.map((question, index) => (
+              <Chip
+                key={index}
+                label={question}
+                variant="outlined"
+                size="small"
+                onClick={() => handleSuggestedQuestion(question)}
+                sx={{ cursor: "pointer" }}
+              />
+            ))}
           </Box>
-        )}
+        </Box>
 
         {/* Input */}
         <Box sx={{ p: 2, pt: 1, borderTop: 1, borderColor: "divider" }}>
