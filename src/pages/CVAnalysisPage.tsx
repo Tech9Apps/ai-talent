@@ -17,7 +17,7 @@ export const CVAnalysisPage: React.FC = () => {
 
   if (loading) {
     return (
-      <Container sx={{ py: 4 }}>
+      <Container sx={{ pb: 4 }}>
         <Typography>Loading...</Typography>
       </Container>
     );
@@ -25,7 +25,7 @@ export const CVAnalysisPage: React.FC = () => {
 
   if (!cvFile || cvFile.id !== id) {
     return (
-      <Container sx={{ py: 4 }}>
+      <Container sx={{ pb: 4 }}>
         <Typography variant="h4" gutterBottom>
           Resume not found
         </Typography>
@@ -37,7 +37,7 @@ export const CVAnalysisPage: React.FC = () => {
   }
 
   return (
-    <Container sx={{ py: 4 }}>
+    <Container sx={{ pb: 4 }}>
       {/* Header with back button */}
       <Box sx={{ mb: 6 }}>
         <Button

@@ -1,0 +1,99 @@
+.glowing-border-wrapper {
+  position: relative;
+  z-index: 0;
+}
+
+.glowing-border-wrapper > * {
+  position: relative;
+  z-index: 1; /* encima del pseudo */
+}
+
+.glowing-border-wrapper::before,
+.glowing-border-wrapper::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  z-index: 1;
+  /* El background se define en el TSX con el tema */
+}
+
+.glowing-border-wrapper::after {
+  z-index: 0;
+  filter: blur(20px);
+}
+
+.glowing-border-wrapper::before,
+.glowing-border-wrapper::after {
+  animation: glowing-border 2s linear forwards;
+}
+
+.glowing-border-wrapper::after {
+  animation: glowing-border 2s linear forwards,
+    blur-effect 2s linear forwards;
+}
+
+@property --angle {
+  syntax: "<angle>";
+  initial-value: 100deg;
+  inherits: false;
+}
+
+@keyframes glowing-border {
+  0% {
+    --angle: 53deg;
+    opacity: 0;
+  }
+  
+  15% {
+    --angle: 90deg;
+    opacity: 1;
+  }
+  
+  30% {
+    --angle: 200deg;
+  }
+  
+  60% {
+    --angle: 360deg;
+  }
+  
+  75% {
+    --angle: 400deg;
+    opacity: 1;
+  }
+
+  100% {
+    --angle: 413deg;
+    opacity: 0;
+  }
+}
+
+@keyframes blur-effect {
+  0% {
+    filter: blur(40px);
+    opacity: 0;
+  }
+  
+  15% {
+    filter: blur(20px);
+    opacity: 1;
+  }
+  
+  30% {
+    filter: blur(40px); /* Glow más ancho en la parte rápida */
+  }
+  
+  60% {
+    filter: blur(40px); /* Mantiene el glow ancho */
+  }
+  
+  75% {
+    filter: blur(20px); /* Vuelve al glow normal */
+    opacity: 1;
+  }
+
+  100% {
+    filter: blur(20px);
+    opacity: 0;
+  }
+}

@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { Box, Alert, Snackbar, CircularProgress } from "@mui/material";
+import {
+  Box,
+  Alert,
+  Snackbar,
+  CircularProgress,
+  Typography,
+} from "@mui/material";
 
 // Components
 import { Header } from "./components/Header/Header";
@@ -64,8 +70,10 @@ function AppContent() {
           gap: 2,
         }}
       >
-        <CircularProgress size={60} />
-        <div>Loading AI-Talent...</div>
+        <CircularProgress size={25} />
+        <Typography variant="caption" color="text.secondary">
+          Loading AI-Talent...
+        </Typography>
       </Box>
     );
   }

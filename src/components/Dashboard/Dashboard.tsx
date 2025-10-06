@@ -56,7 +56,7 @@ const WelcomeSection: React.FC<WelcomeSectionProps> = ({ user }) => {
           fontWeight: 500,
           color: "#EA8600",
           fontSize: { xs: "2rem", md: "2.5rem" },
-          minHeight: { xs: "3rem", md: "4rem" }, // Reserve space to prevent layout shift
+          minHeight: { xs: "3rem" }, // Reserve space to prevent layout shift
         }}
       >
         <ReactTyped
@@ -191,7 +191,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const jobDescriptionsCount = jobDescriptionFiles?.length || 0;
 
   return (
-    <Container sx={{ py: 4 }}>
+    <Container sx={{ pb: 4 }}>
       <WelcomeSection user={user} />
       <Grid container spacing={8}>
         {/* Main content area */}

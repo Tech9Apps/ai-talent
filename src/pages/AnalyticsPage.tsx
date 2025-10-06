@@ -150,7 +150,7 @@ export const AnalyticsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <Container sx={{ py: 4 }}>
+      <Container sx={{ pb: 4 }}>
         <Box
           sx={{
             display: "flex",
@@ -167,14 +167,14 @@ export const AnalyticsPage: React.FC = () => {
 
   if (error) {
     return (
-      <Container sx={{ py: 4 }}>
+      <Container sx={{ pb: 4 }}>
         <Alert severity="error">{error}</Alert>
       </Container>
     );
   }
 
   return (
-    <Container sx={{ py: 4 }}>
+    <Container sx={{ pb: 4 }}>
       {/* Header */}
       <Box sx={{ mb: 6 }}>
         <Button
